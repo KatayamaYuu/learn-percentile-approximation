@@ -150,7 +150,7 @@
   - _Requirements: 2.6, 5.3_
 
 - [ ] 6. 定義の文書
-- [ ] 6.1 (P) パーセンタイル定義と誤差指標の文書を書く
+- [x] 6.1 (P) パーセンタイル定義と誤差指標の文書を書く
   - 5定義の意味、位置と順位の解決規則(浮動小数点の丸め処理を含む)、NumPy の同名の方式との対応、`[10, 20, 30, 40]` と q = 0.4 での結果の違いを書く
   - 3誤差の定義式、順位誤差の目標順位を最近順位法で定めること、同値がある場合とデータにない推定値の順位の定め方を書く
   - 完了時の状態: 2つの文書が日本語で書かれ、文書中の例の値が定義のテストの期待値と一致している
@@ -184,3 +184,4 @@
 - 系列化(4.2): runSweep は件数昇順(同数は入力順)、最初の入力エラーで中断。seriesByAlgorithm は Map→Object.fromEntries で構築し __proto__ 等の id も own キーになる(プロトタイプは Object.prototype のまま)。
 - 公開入口(5.1): src/core/index.ts は設計の契約に出る API のみ再エクスポート(resolvePosition/nearestRank/isQuantile/checkPositiveFinite/isParamRecord/BYTES_PER_NUMBER 等も含む)。内部補助(createSampler 等)は非公開。ExactOptions は sort-exact 側を公開。
 - 計算量(5.3): 実測(データseed 20260101, quickselect seed 7, q=0.5)。整列 0.87〜0.94×n·log2n、quickselect 最大 9.09n(n=1e5, linear)で 10n の余裕は薄い。乱数・生成器・pivot 選択を変えたら実測値を確かめてから上限を調整する。
+- 文書(6.1): 日本語と英数字・数字の間に半角空白を入れない。docs/core の例の値は src/core/docs-examples.test.ts が実装値と文書の文字列の両方で検証する(6.2 の文書も同じテストに追加する)。NumPy との対応は NumPy 実行で確認済み(nearest-rank は inverted_cdf 相当)。
