@@ -51,7 +51,7 @@
   - _Boundary: QuantileDefinitions_
   - _Requirements: 2.2, 2.4, 2.7, 4.3_
 
-- [ ] 2.4 アルゴリズム共通の操作規約と、実験条件の記録の型を定める
+- [x] 2.4 アルゴリズム共通の操作規約と、実験条件の記録の型を定める
   - 値の投入、分位点の問い合わせ、メモリ見積もり、操作数の取得、初期化を、すべてのアルゴリズムが従う規約として型で定める
   - アルゴリズムの生成仕様に、識別子、表示名、シードを受け取る生成関数、任意のパラメータ記録、任意の受け付け範囲を持たせる
   - パラメータ記録が有限の数・文字列・真偽値だけからなるかを判定する関数を、共通規約と同じ場所に用意する(基盤の層は規約の型を import できないため、検証関数の置き場には置かない。ハーネスと適合確認が共有する)
@@ -174,3 +174,4 @@
 ## Implementation Notes
 - ライセンス判定(1.2): 利用者の判断で許可リストに MPL-2.0(lightningcss)と CC0-1.0(spdx-license-ids)を追加し、CC-BY-3.0 の spdx-exceptions@2.5.0 と spdx-ranges@2.1.1 は --excludePackages で除外した。design.md の許可リストは未更新。
 - 乱数(2.1): シード混合は splitmix32 系(加算 0x9e3779b9、finalizer 0x85ebca6b/0xc2b2ae35)を4回適用、先頭20個を読み捨て。nextIntBelow は不正な上限で RangeError を投げる。既知の列はこの選択に依存する。
+- 契約(2.4): パラメータ記録の判定関数は `isParamRecord`(src/core/contract/sketch.ts)。後続タスクはこの名前で import する。
