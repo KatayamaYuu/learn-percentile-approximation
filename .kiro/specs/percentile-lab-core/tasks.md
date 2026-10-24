@@ -141,7 +141,7 @@
   - 完了時の状態: 上記の統合テストと性質テストがすべて通る
   - _Requirements: 1.3, 1.9, 2.3, 2.8, 4.3, 5.4, 6.3_
 
-- [ ] 5.3 操作数の増え方で2方式の計算量の違いを実測するテストを加える
+- [x] 5.3 操作数の増え方で2方式の計算量の違いを実測するテストを加える
   - 計測条件を固定する。データは一様分布・生成順・固定シードで作り、q = 0.5 を1回だけ問い合わせる。定義は下側値(補間なし)と線形補間(右側の最小値探索あり)の両方で測り、quickselect のシードも固定する
   - 件数 1,000、10,000、100,000 のデータで2方式の比較回数を取得する
   - 整列方式は n log2 n の 0.5 倍から 1.0 倍、quickselect 方式は n の 10 倍以下に収まることを確かめる。3分割の比較と線形補間の最小値探索で期待値は 7〜8n 程度になり余裕が小さいため、外れる場合は実測値と根拠を確かめてから上限を調整する
@@ -183,3 +183,4 @@
 - ハーネス(4.1): 検証順は data→quantiles→sketches→meta→params。invalid-params の field は meta / params:${spec.id}。空の quantiles は許容(queries が空)。型は harness/types.ts にあり、4.2 は SweepResult/SeriesPoint をここへ追加する。accessor(operationCounts/memoryBytes)が投げた場合は記録されず全体が中断する(許容)。
 - 系列化(4.2): runSweep は件数昇順(同数は入力順)、最初の入力エラーで中断。seriesByAlgorithm は Map→Object.fromEntries で構築し __proto__ 等の id も own キーになる(プロトタイプは Object.prototype のまま)。
 - 公開入口(5.1): src/core/index.ts は設計の契約に出る API のみ再エクスポート(resolvePosition/nearestRank/isQuantile/checkPositiveFinite/isParamRecord/BYTES_PER_NUMBER 等も含む)。内部補助(createSampler 等)は非公開。ExactOptions は sort-exact 側を公開。
+- 計算量(5.3): 実測(データseed 20260101, quickselect seed 7, q=0.5)。整列 0.87〜0.94×n·log2n、quickselect 最大 9.09n(n=1e5, linear)で 10n の余裕は薄い。乱数・生成器・pivot 選択を変えたら実測値を確かめてから上限を調整する。
