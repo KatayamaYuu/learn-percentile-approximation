@@ -71,7 +71,7 @@
   - _Depends: 2.3_
   - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 2.1, 2.4, 2.7, 2.8, 5.3, 5.5_
 
-- [ ] 3.2 (P) quickselect 方式の厳密解を実装する
+- [x] 3.2 (P) quickselect 方式の厳密解を実装する
   - 値の保持と入力検証の規則は整列方式と同じにする(保持の仕組みは各ファイルに実装し、整列方式とファイルを共有しない)
   - 問い合わせごとに保持した配列のコピーを作り(移動として数える)、反復型の3分割 quickselect で下側の位置の値を選ぶ。基準値はシード付き乱数で選ぶ
   - 補間が必要な定義では、選択後に下側より右の最小値を計数付きで求めて上側の値とする
@@ -176,3 +176,4 @@
 - 乱数(2.1): シード混合は splitmix32 系(加算 0x9e3779b9、finalizer 0x85ebca6b/0xc2b2ae35)を4回適用、先頭20個を読み捨て。nextIntBelow は不正な上限で RangeError を投げる。既知の列はこの選択に依存する。
 - 契約(2.4): パラメータ記録の判定関数は `isParamRecord`(src/core/contract/sketch.ts)。後続タスクはこの名前で import する。
 - 整列方式(3.1): spec id は `exact-sort-${definition}`(quickselect は `exact-quickselect-…` とする)。投入1回=移動1、容量は初期16で倍増しコピーを移動として数える。併合整列は値同士の比較1回=比較1、書き込み1回=移動1。query は分位点範囲→空の順に検査する。
+- quickselect(3.2): 比較は pivot との "x<pivot" 次いで "x>pivot"(同値は2回)、交換=移動2(自己交換は0)、問い合わせごとのコピー=移動n、右側最小値探索は hi>lo かつ上側値を使う定義(linear/midpoint/higher)のみ。pivot 選択は数えない。実測 n=1e5, q=0.5 で比較 約6.3〜6.8n。ExactOptions は両ファイルで別宣言。invalid seed は RangeError。
