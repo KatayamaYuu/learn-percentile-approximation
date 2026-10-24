@@ -128,7 +128,7 @@
   - _Requirements: 6.3, 6.7_
 
 - [ ] 5. 統合と検証
-- [ ] 5.1 公開入口を作り、後続 spec が入口だけで全機能を使えることを確かめる
+- [x] 5.1 公開入口を作り、後続 spec が入口だけで全機能を使えることを確かめる
   - 共通規約、厳密解とその生成仕様、データ生成、誤差指標、基準値計算、計測ハーネス、適合確認と、それらの型を入口から再エクスポートする。内部の補助関数は公開しない
   - 完了時の状態: 入口だけを import するテストで、データを生成し、厳密解2方式をハーネスで計測し、適合確認を実行するまでの一連の操作が通る
   - _Depends: 3.1, 3.2, 3.3, 3.5, 4.2_
@@ -182,3 +182,4 @@
 - 適合確認(3.5): runConformance(spec, {seed?}) は13項目(設計の項目に reset 後の再投入比較・同シード同操作数・params JSON を追加)。拒否系は拒否呼び出しの直前直後で操作数・メモリを比較し、回答比較は外側で行う(quickselect は問い合わせで操作数が増えるため)。supportedRange.max が非常に大きい有限値だと max*2 が Infinity になり誤検知しうる。
 - ハーネス(4.1): 検証順は data→quantiles→sketches→meta→params。invalid-params の field は meta / params:${spec.id}。空の quantiles は許容(queries が空)。型は harness/types.ts にあり、4.2 は SweepResult/SeriesPoint をここへ追加する。accessor(operationCounts/memoryBytes)が投げた場合は記録されず全体が中断する(許容)。
 - 系列化(4.2): runSweep は件数昇順(同数は入力順)、最初の入力エラーで中断。seriesByAlgorithm は Map→Object.fromEntries で構築し __proto__ 等の id も own キーになる(プロトタイプは Object.prototype のまま)。
+- 公開入口(5.1): src/core/index.ts は設計の契約に出る API のみ再エクスポート(resolvePosition/nearestRank/isQuantile/checkPositiveFinite/isParamRecord/BYTES_PER_NUMBER 等も含む)。内部補助(createSampler 等)は非公開。ExactOptions は sort-exact 側を公開。
