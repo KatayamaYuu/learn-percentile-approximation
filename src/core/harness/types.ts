@@ -62,3 +62,14 @@ export interface BenchmarkResult {
   readonly meta: ParamRecord;
   readonly algorithms: readonly AlgorithmResult[];
 }
+
+export interface SweepResult {
+  readonly schemaVersion: 1;
+  /** count の昇順。同じ件数は入力の並びを保つ */
+  readonly runs: readonly BenchmarkResult[];
+}
+
+export interface SeriesPoint {
+  readonly count: number;
+  readonly result: AlgorithmResult;
+}

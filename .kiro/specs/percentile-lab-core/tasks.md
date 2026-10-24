@@ -120,7 +120,7 @@
   - _Depends: 2.3, 2.4, 3.4_
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
-- [ ] 4.2 件数違いの複数条件の計測と、アルゴリズム別の系列化を実装する
+- [x] 4.2 件数違いの複数条件の計測と、アルゴリズム別の系列化を実装する
   - 複数の条件を順に実行し、件数の昇順に並べた結果を返す。途中の条件で入力エラーがあればそのエラーを返す
   - 結果を、アルゴリズムの識別子ごとに件数順の系列へ並べ替える
   - 複数条件の結果と系列の型は、4.1 で作ったハーネスの型定義に追加する。テストは複数条件の計測専用のテストファイルに置く
@@ -181,3 +181,4 @@
 - 誤差指標(3.4): rankError は sortedData の先頭・末尾のみ検証(O(log n) を保つため。整列済みは呼び出し側の前提)。検査順は 分位点→空→estimate→data。順位誤差は |rank-target|/n。
 - 適合確認(3.5): runConformance(spec, {seed?}) は13項目(設計の項目に reset 後の再投入比較・同シード同操作数・params JSON を追加)。拒否系は拒否呼び出しの直前直後で操作数・メモリを比較し、回答比較は外側で行う(quickselect は問い合わせで操作数が増えるため)。supportedRange.max が非常に大きい有限値だと max*2 が Infinity になり誤検知しうる。
 - ハーネス(4.1): 検証順は data→quantiles→sketches→meta→params。invalid-params の field は meta / params:${spec.id}。空の quantiles は許容(queries が空)。型は harness/types.ts にあり、4.2 は SweepResult/SeriesPoint をここへ追加する。accessor(operationCounts/memoryBytes)が投げた場合は記録されず全体が中断する(許容)。
+- 系列化(4.2): runSweep は件数昇順(同数は入力順)、最初の入力エラーで中断。seriesByAlgorithm は Map→Object.fromEntries で構築し __proto__ 等の id も own キーになる(プロトタイプは Object.prototype のまま)。
