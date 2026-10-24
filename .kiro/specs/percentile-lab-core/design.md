@@ -780,7 +780,7 @@ function seriesByAlgorithm(sweep: SweepResult): Readonly<Record<string, readonly
 - `.nvmrc`: `22`。
 - `tsconfig.json`: `strict`、`module: esnext`、`moduleResolution: bundler`、`target: es2023`、`noUncheckedIndexedAccess`、`verbatimModuleSyntax`、`isolatedModules`、`noEmit`、`skipLibCheck`、`types: ["node"]`、`lib: ["ES2023"]`(DOM を含めない)。DOM の API を使うと型チェックで失敗する。これにより 7.1 を機械的に守る。
 - `vite.config.ts`: `vitest/config` の `defineConfig` を用い、`test.environment` は `node`、対象は `src/**/*.test.ts`。
-- ライセンス判定は `license-checker-rseidelsohn` 4.4.2 を固定して使う。許可するライセンスは `MIT`、`ISC`、`BSD-2-Clause`、`BSD-3-Clause`、`Apache-2.0`、`0BSD`、`BlueOak-1.0.0` を初期値とし、実行時依存が空のため、開発時依存を含めて判定する。許可リストの拡張は、内容を確認したうえで意識的に行う。
+- ライセンス判定は `license-checker-rseidelsohn` 4.4.2 を固定して使う。許可するライセンスは `MIT`、`ISC`、`BSD-2-Clause`、`BSD-3-Clause`、`Apache-2.0`、`0BSD`、`BlueOak-1.0.0` を初期値とし、実行時依存が空のため、開発時依存を含めて判定する。実装時に、Vite の依存である `lightningcss`(MPL-2.0)と `spdx-license-ids`(CC0-1.0)で判定が失敗したため、利用者の判断で `MPL-2.0` と `CC0-1.0` を許可リストに加えた。CC-BY-3.0 を含む `spdx-exceptions@2.5.0` と `spdx-ranges@2.1.1` は許可リストに加えず、`--excludePackages` でバージョンを指定して除外している。いずれも開発時の推移的依存で、配布物には含まれない。許可リストの拡張は、内容を確認したうえで意識的に行う。
 - `.gitignore`: `node_modules/`、`.vitest/`、`dist/`。
 - 型チェックには `tsc --noEmit` のみを用いる。typescript-eslint は TypeScript 7 に未対応のため、導入しない。
 
