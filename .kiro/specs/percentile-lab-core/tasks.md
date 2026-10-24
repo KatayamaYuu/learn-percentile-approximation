@@ -110,7 +110,7 @@
   - _Requirements: 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 5.3, 5.4, 5.5_
 
 - [ ] 4. 計測ハーネス
-- [ ] 4.1 1条件の計測を実装する
+- [x] 4.1 1条件の計測を実装する
   - 入力(データ、分位点、アルゴリズムの一覧、実験条件の記録)を検証し、不正なら1つも実行せずにエラーを返す
   - データの整列済みコピーから、指定した定義(既定は線形補間)で基準値を計数なしで求める
   - 各アルゴリズムを同じシードで生成し、同じデータを同じ順序で投入して各分位点を問い合わせる。投入完了時点と全問い合わせ後の操作数とメモリ見積もり、問い合わせごとの推定値・基準値・3誤差・増えた操作数・時間を記録する。時間は注入できる関数で測る
@@ -180,3 +180,4 @@
 - データ生成(3.3): 検証順は件数→シード→並び順→分布パラメータ。乱数消費は標本ごと(Box-Muller は u1=nextFloatOpen, u2=nextFloat で cos のみ使用、多峰は山選択に nextFloat 1個)で、並べ替えでは消費しない。変更すると生成値が変わる。
 - 誤差指標(3.4): rankError は sortedData の先頭・末尾のみ検証(O(log n) を保つため。整列済みは呼び出し側の前提)。検査順は 分位点→空→estimate→data。順位誤差は |rank-target|/n。
 - 適合確認(3.5): runConformance(spec, {seed?}) は13項目(設計の項目に reset 後の再投入比較・同シード同操作数・params JSON を追加)。拒否系は拒否呼び出しの直前直後で操作数・メモリを比較し、回答比較は外側で行う(quickselect は問い合わせで操作数が増えるため)。supportedRange.max が非常に大きい有限値だと max*2 が Infinity になり誤検知しうる。
+- ハーネス(4.1): 検証順は data→quantiles→sketches→meta→params。invalid-params の field は meta / params:${spec.id}。空の quantiles は許容(queries が空)。型は harness/types.ts にあり、4.2 は SweepResult/SeriesPoint をここへ追加する。accessor(operationCounts/memoryBytes)が投げた場合は記録されず全体が中断する(許容)。
