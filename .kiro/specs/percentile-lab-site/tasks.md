@@ -188,7 +188,7 @@
   - _Boundary: Router・Layout・PageRegistry・ConditionStore・SiteCss_
   - _Requirements: 1.2, 1.3, 1.4, 1.6, 1.7, 1.8, 2.9, 10.1, 10.5, 10.6, 10.7, 10.8_
 
-- [ ] 6. 学習ページ
+- [x] 6. 学習ページ
 - [x] 6.1 各ページ共通の骨組みを実装する
   - 操作部品の列と結果の列の 2 列の骨組み、保持した条件の復元(なければ既定値)、既定に戻す操作、条件の変更 → 検証 → 計算量の確認 → 計算の依頼の配線、結果の受け取り → 表示の変換 → パネルの更新、誤差の選択の変更でグラフだけを作り直すこと、ページを離れるときの破棄を作る
   - 完了時の状態: 偽の計算の窓口で、初回に既定の条件で依頼する、既定に戻すと既定の条件で依頼する、検証の問題や上限超過では依頼しない、離れると破棄が呼ばれることの DOM 環境のテストが通る
@@ -217,7 +217,7 @@
   - _Boundary: RelativePage_
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 9.2, 9.6_
 
-- [ ] 6.5 (P) 横断比較ビューを組み立てる
+- [x] 6.5 (P) 横断比較ビューを組み立てる
   - 手法の追加・削除の一覧(種類の選択とパラメータの入力)、共通の HDR の範囲の操作部品を置き、横断比較の表示、比較表、処理時間の注記、各ページの解説への案内をつなぐ
   - 完了時の状態: 偽の計算の窓口と記録した結果で、比較表とグラフと処理時間の注記が出て、対象が 0 件のとき選択を促して依頼しない、同じ手法の重複を追加できないことの DOM 環境のテストが通る
   - _Depends: 4.4, 6.1_
@@ -263,3 +263,4 @@
 - 6.2: 共通のデータ条件の操作部品は src/site/ui/pages/data-controls.ts の createDataControls({ idPrefix, host: { initial: DataCondition, update(fn) } }) → { elements: [分布, 件数, シード, 順序], setValue(data)(update を呼ばない), showIssues(issues)(data.distribution.*・data.count・data.seed・data.order を対応づけ、古い理由を消す) }。ページは host.update(c => ({...c, data: fn(c.data)})) で包んで使い、ページごとに別の idPrefix を渡す(hist-・stream-・rel-・cmp- など。分布の部品の id は固定で、同時に 2 ページは載らない)。ページのモジュールは histogramPage(id histogram・path /histogram)をエクスポートし、page-registry.ts は 7.1 で差し替える。テスト用に histogramPageSpec と mountHistogramPage(container, context, deps) も公開している。
 - 6.3: streamingPage(id streaming・path /streaming・idPrefix stream)を src/site/ui/pages/streaming-page.ts からエクスポート。内部状態の図のグラフ id は対象に応じて streaming-inspect-gk|kll|tdigest と変わるため、対象を切り替えると PageKit が全パネルを作り直す(軸の切り替えは初期化される)。ε・k・δ・スケール関数の部品は手法を選んでいなくても出したままにする。
 - 6.4: relativePage(id relative・path /relative-error・idPrefix rel)を src/site/ui/pages/relative-page.ts からエクスポート。α(0<α<1)の確認は shared/validate.ts にないため、ページ側の validate ラッパで ddsketch を選んだときだけ行っている(ALPHA_BOUNDS を使う)。Worker 側の alpha の失敗の対応づけは残す。手動の HDR 範囲の初期値は 0.01〜100000。
+- 6.5: comparePage(id compare・path /compare・idPrefix cmp)を src/site/ui/pages/compare-page.ts からエクスポート。処理時間が参考値である旨(8.6)は手引き(explainer-guide)に常に出るが、PageKit では手引きが結果の下に置かれるため、設計の「結果の上に常に表示」とは位置が違う(要件 8.6 は満たす)。7.2 の目視で見て、必要なら .compare-note として制御列かページ上部に静的に置く。共通の HDR 範囲の部品は HDR を選んでいなくても出したままにする。比較ページの誤差の選択の既定は順位誤差(最大)。

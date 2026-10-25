@@ -370,13 +370,15 @@ button[aria-pressed='true'] {
 }
 
 .chart-table-scroll,
-.state-table-scroll {
+.state-table-scroll,
+.compare-table-scroll {
   max-width: 100%;
   overflow: auto;
 }
 
 .chart-table-scroll table,
-.state-table-scroll table {
+.state-table-scroll table,
+.compare-table-scroll table {
   border-collapse: collapse;
   font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
@@ -385,7 +387,9 @@ button[aria-pressed='true'] {
 .chart-table-scroll th,
 .chart-table-scroll td,
 .state-table-scroll th,
-.state-table-scroll td {
+.state-table-scroll td,
+.compare-table-scroll th,
+.compare-table-scroll td {
   border: 1px solid var(--border);
   padding: 4px 8px;
   text-align: right;
@@ -393,12 +397,14 @@ button[aria-pressed='true'] {
 }
 
 .chart-table-scroll th,
-.state-table-scroll th {
+.state-table-scroll th,
+.compare-table-scroll th {
   background: var(--surface);
 }
 
 .chart-table-scroll caption,
-.state-table-scroll caption {
+.state-table-scroll caption,
+.compare-table-scroll caption {
   text-align: left;
   color: var(--text-muted);
   padding-bottom: 4px;
@@ -531,4 +537,68 @@ button[aria-pressed='true'] {
 .hdr-notices {
   padding-left: 2em;
   color: var(--text-muted);
+}
+
+/* 横断比較のページ */
+.compare-algorithms,
+.compare-add {
+  margin: 16px 0;
+  min-width: 0;
+}
+
+.compare-algorithms-title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.compare-algorithm-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compare-algorithm-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 4px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+
+.compare-algorithm-name {
+  flex: 1 1 12em;
+}
+
+.compare-algorithm-reason {
+  flex-basis: 100%;
+}
+
+.compare-note {
+  margin: 12px 0;
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+
+.compare-table-scroll th[scope='row'] {
+  text-align: left;
+}
+
+.compare-table-reason {
+  color: var(--danger);
+  font-weight: 700;
+  text-align: left;
+  white-space: normal;
+}
+
+.explainer-links {
+  margin-top: 16px;
 }
