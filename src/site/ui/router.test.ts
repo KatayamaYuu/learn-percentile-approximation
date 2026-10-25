@@ -10,9 +10,8 @@ function makeContext(announce: (m: string) => void = () => {}): PageContext {
   return {
     store: createConditionStore(),
     announce,
-    createCompute: () => {
-      throw new Error('このテストでは計算しない');
-    },
+    // 実際のページは表示時に ComputeClient を作る。このテストでは計算を依頼しない偽のものを返す
+    createCompute: () => ({ request() {}, retry() {}, subscribe: () => () => {}, dispose() {} }),
   };
 }
 
@@ -85,12 +84,6 @@ describe('startRouter', () => {
     expect(h1s[0]!.textContent).toBe(page.title);
     expect(document.title).toContain(page.title);
     expect(root.querySelector('main')).not.toBeNull();
-  });
-
-  it('4 つの学習ページの仮のページは「準備中」と表示する', () => {
-    window.location.hash = '#/streaming';
-    stop = startRouter(root, makeContext());
-    expect(root.querySelector('main')!.textContent).toContain('準備中');
   });
 
   it('共通のナビゲーションが 5 ページへのリンクを持ち、現在のページに aria-current="page" を付ける(1.3)', async () => {

@@ -1,10 +1,13 @@
-// ページの登録。5 ページ + 見つからないページ。4 つの学習ページは、7.1 で実際のページに差し替えるまでの仮のページ(準備中)。
-import { HOME_CONTENT } from '../content/guides';
+// ページの登録。5 ページ + 見つからないページ。
 import type { PageId } from '../shared/conditions';
 import type { ComputeClient } from './compute/compute-client';
 import type { ConditionStore } from './condition-store';
+import { comparePage } from './pages/compare-page';
+import { histogramPage } from './pages/histogram-page';
 import { homePage } from './pages/home-page';
 import { notFoundPage } from './pages/not-found-page';
+import { relativePage } from './pages/relative-page';
+import { streamingPage } from './pages/streaming-page';
 
 export interface PageContext {
   readonly store: ConditionStore;
@@ -28,33 +31,11 @@ export interface PageModule {
   mount(container: HTMLElement, context: PageContext): PageInstance;
 }
 
-function familyTitle(page: PageId): string {
-  const family = HOME_CONTENT.families.find((f) => f.page === page);
-  if (family === undefined) throw new Error(`系統の題名が見つかりません: ${page}`);
-  return family.title;
-}
-
-function placeholderPage(id: Exclude<PageId, 'home'>, path: string): PageModule {
-  const title = familyTitle(id);
-  return {
-    id,
-    path,
-    title,
-    navLabel: title,
-    mount(container) {
-      const p = document.createElement('p');
-      p.textContent = 'このページは準備中です。';
-      container.append(p);
-      return { unmount() {} };
-    },
-  };
-}
-
 export const PAGES: readonly PageModule[] = [
   homePage,
-  placeholderPage('histogram', '/histogram'),
-  placeholderPage('streaming', '/streaming'),
-  placeholderPage('relative', '/relative-error'),
-  placeholderPage('compare', '/compare'),
+  histogramPage,
+  streamingPage,
+  relativePage,
+  comparePage,
   notFoundPage,
 ];
