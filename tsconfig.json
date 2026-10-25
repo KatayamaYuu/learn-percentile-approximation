@@ -12,5 +12,6 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "vite.config.ts"]
+  "include": ["src/**/*.ts", "vite.config.ts"],
+  "exclude": ["src/site/ui/**", "src/site/main.ts", "src/site/worker/entry.ts"]
 }

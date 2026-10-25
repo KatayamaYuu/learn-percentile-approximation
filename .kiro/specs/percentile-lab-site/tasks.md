@@ -2,8 +2,8 @@
 
 > 前提: percentile-lab-core と histogram-percentile は実装済み。streaming-quantile-sketches と relative-error-sketches のすべてのタスク(公開入口 `src/streaming/index.ts`、`src/relative-error/index.ts`、そのテスト、`docs/streaming/` と `docs/relative-error/` の文書を含む)が完了してから着手する。上流のソース(`src/core/`、`src/histogram/`、`src/streaming/`、`src/relative-error/`)と `docs/` は変更しない。
 
-- [ ] 1. 基盤: 依存、組み立て、型チェックの構成
-- [ ] 1.1 サイトの依存、組み立ての設定、3 つの型チェック構成、総合確認の手順を整える
+- [x] 1. 基盤: 依存、組み立て、型チェックの構成
+- [x] 1.1 サイトの依存、組み立ての設定、3 つの型チェック構成、総合確認の手順を整える
   - 着手の前に、上流 2 系統の公開入口と文書(`docs/streaming/`、`docs/relative-error/`)が存在し、既存のテストがすべて通ることを確かめる。満たさなければ作業を止めて報告する
   - グラフのライブラリ(4.5.1 に固定)を実行時依存に、DOM のテスト環境(20.14.5 に固定)を開発時依存に加える。開発サーバー、組み立て、組み立て結果の確認、bundle の大きさの確認の各手順を追加する
   - 組み立ての設定に、相対パスの配信物、出力先、Worker のモジュール形式を加える。テストの設定(node 環境、対象のパターン)は変えない
