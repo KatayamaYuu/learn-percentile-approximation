@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { generate, type AlgorithmResult, type BenchmarkResult } from '../core';
+import { exactQuantileSorted, generate, type AlgorithmResult, type BenchmarkResult } from '../core';
 import {
   createDDSketch,
   createHdrLayout,
@@ -403,5 +403,91 @@ describe('experiments.md の数値', () => {
     expect(at(100000, 2).query / at(1000, 2).query).toBeLessThan(1.1);
     expect(Math.round(at(100000, 0).query / at(1000, 0).query)).toBe(175);
     expect(Math.round((at(100000, 1).query / at(1000, 1).query) * 100) / 100).toBe(1.25);
+  });
+});
+
+// ---- comparison.md: 相対誤差の保証と順位誤差の保証の向き不向き ----
+
+const COMPARISON_QUANTILES: readonly number[] = [0.5, 0.9, 0.99, 0.999];
+const RANK_EPSILON = 0.01;
+
+function comparisonExperiment(distribution: RelativeErrorCase['distribution']) {
+  const r = runRelativeErrorExperiment({
+    cases: [{ label: 'c', distribution, hdrRange: WIDE_HDR }],
+    counts: [100000],
+    seed: SEED,
+    quantiles: COMPARISON_QUANTILES,
+    alphas: [0.01, 0.05],
+    maxBucketsList: [2048],
+    significantDigitsList: [2],
+    referenceDefinition: 'nearest-rank',
+  });
+  if (!r.ok) throw new Error(JSON.stringify(r.error));
+  return r.value.cases[0]!.sweep.runs[0]!;
+}
+
+const queryOf = (run: BenchmarkResult, id: string, quantile: number) => {
+  const q = algorithmOf(run, id).queries.find((x) => x.quantile === quantile);
+  if (q === undefined) throw new Error(`query: ${id} ${quantile}`);
+  return q;
+};
+
+/** 表 E: 重い裾の分布。DDSketch の相対誤差・順位誤差と、順位誤差 ε が許す値のずれ */
+function tableE() {
+  const distribution = { kind: 'heavy-tail', scale: 1, shape: 1.5 } as const;
+  const run = comparisonExperiment(distribution);
+  const g = generate({ distribution, count: 100000, seed: SEED });
+  if (!g.ok) throw new Error('generate');
+  const sorted = Float64Array.from(g.value).sort();
+  const data = COMPARISON_QUANTILES.map((q) => {
+    const dd = queryOf(run, 'ddsketch-a0.01-m2048', q);
+    const exact = exactQuantileSorted(sorted, q, 'nearest-rank');
+    const lower = exactQuantileSorted(sorted, q - RANK_EPSILON, 'nearest-rank');
+    return { q, rel: dd.relativeError, rank: dd.rankError, allowed: Math.abs(lower - exact) / exact };
+  });
+  return { data, rows: data.map((d) => row(d.q, sig(d.rel, 3), sig(d.rank, 3), sig(d.allowed, 3))) };
+}
+
+/** 表 F: 狭い範囲に集中した分布。DDSketch(α = 0.01、0.05)と HDR(d = 2)の相対誤差・順位誤差 */
+function tableF() {
+  const run = comparisonExperiment({ kind: 'uniform', min: 1000, max: 1010 });
+  const ids = ['ddsketch-a0.01-m2048', 'ddsketch-a0.05-m2048', 'hdr-d2'] as const;
+  const data = COMPARISON_QUANTILES.map((q) => ({ q, byId: ids.map((id) => queryOf(run, id, q)) }));
+  return {
+    data,
+    rows: data.map((d) => row(d.q, ...d.byId.flatMap((x) => [sig(x.relativeError, 3), sig(x.rankError, 3)]))),
+  };
+}
+
+describe('comparison.md の数値', () => {
+  const doc = readDoc('comparison.md');
+  const hasRows = (rows: readonly string[]): void => {
+    for (const r of rows) expect(doc, r).toContain(`${r}\n`);
+  };
+
+  it('表 E: 重い裾の分布', () => {
+    const e = tableE();
+    hasRows(e.rows);
+    for (const d of e.data) expect(d.rel).toBeLessThanOrEqual(0.01);
+    // 順位誤差 ε が許す値のずれは、高い分位点ほど大きい
+    for (let i = 1; i < e.data.length; i++) expect(e.data[i]!.allowed).toBeGreaterThan(e.data[i - 1]!.allowed);
+    expect(sig(e.data[3]!.allowed * 100, 2)).toBe('79');
+    expect(e.data[3]!.rank).toBeLessThan(0.0001);
+    expect(sig(e.data[3]!.rank, 1)).toBe('0.00002');
+  });
+
+  it('表 F: 狭い範囲に集中した分布', () => {
+    const f = tableF();
+    hasRows(f.rows);
+    const limits = [0.01, 0.05, 1 / 256];
+    for (const d of f.data) {
+      d.byId.forEach((x, i) => expect(x.relativeError).toBeLessThanOrEqual(limits[i]!));
+    }
+    const at = (q: number) => f.data.find((d) => d.q === q)!.byId;
+    // α = 0.05 では中央値の順位誤差が 0.5、α = 0.01 では分位点 0.999 の順位誤差が 0.755
+    expect(at(0.5)[1]!.rankError).toBe(0.5);
+    expect(sig(at(0.999)[0]!.rankError, 3)).toBe('0.755');
+    // 順位誤差 0.01 の保証を、この分布では満たさない
+    for (const x of f.data.flatMap((d) => d.byId.slice(0, 1))) expect(x.rankError).toBeGreaterThan(RANK_EPSILON);
   });
 });
