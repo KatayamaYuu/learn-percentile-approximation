@@ -189,7 +189,7 @@
   - _Requirements: 1.2, 1.3, 1.4, 1.6, 1.7, 1.8, 2.9, 10.1, 10.5, 10.6, 10.7, 10.8_
 
 - [ ] 6. 学習ページ
-- [ ] 6.1 各ページ共通の骨組みを実装する
+- [x] 6.1 各ページ共通の骨組みを実装する
   - 操作部品の列と結果の列の 2 列の骨組み、保持した条件の復元(なければ既定値)、既定に戻す操作、条件の変更 → 検証 → 計算量の確認 → 計算の依頼の配線、結果の受け取り → 表示の変換 → パネルの更新、誤差の選択の変更でグラフだけを作り直すこと、ページを離れるときの破棄を作る
   - 完了時の状態: 偽の計算の窓口で、初回に既定の条件で依頼する、既定に戻すと既定の条件で依頼する、検証の問題や上限超過では依頼しない、離れると破棄が呼ばれることの DOM 環境のテストが通る
   - _Depends: 2.2, 5.1, 5.2, 5.3, 5.4, 5.5_
@@ -259,3 +259,4 @@
 - 5.3 のグラフ部品は src/site/ui/components/ にある(chart-setup・chart-styles・chart-renderer・chart-panel)。カテゴリ軸の棒は系列ごとに別の dataset なので、各カテゴリの枠の中で左に寄って描かれる(読み取りには支障なし。7.2 の目視で見て、必要なら barPercentage などで調整する)。パネルの CSS の class(chart-panel・chart-canvas-frame・chart-controls・chart-notes・chart-table-scroll など)は 5.5 で定義し、.chart-canvas-frame には高さが必要。パネルを main.ts から使うとメインの bundle は圧縮後およそ 62 KB。
 - 5.4: 6.1 の PageKit は最後に依頼した JobRequest を保持し、done の状態を受け取った時点で ConditionSummary.show(job, result) を呼ぶ(ComputeStatus は job を持たない)。再実行ボタンは exception の失敗だけに出る。Explainer の見出しは h2(節)・h3(手法名)・h4(4 項目)で、ページの題名を h1 とする前提。5.5 のレイアウトは h1 を 1 つ、結果と操作の領域を h2 にする。5.4 の部品が使う CSS の class は status-bar・status-pending・status-failed・condition-summary・state-table(-scroll・-notice・-gap・-rejected・-facts)・explainer(-item・-algorithms・-guide)・control-error-selector。state-table-scroll は overflow: auto が必要。
 - 5.5: 7.1 の main.ts は ./ui/styles/site.css を import し、startRouter(root, { store: createConditionStore(), announce, createCompute }) を呼ぶ。PAGES の 4 つの準備中ページを 6.2〜6.5 に差し替える。2 列の骨組みは .page-columns・.page-controls・.page-results(site.css に定義済み)。ConditionStore は同じ参照を保存・返却するので、ページは保存した条件を書き換えない。--border の色は白に対して約 2.1:1(非テキストの 3:1 に満たない)。スキップリンクは未実装(要件になし)。ページを実装する 6.x が site.css に無い class を使うとクラス走査のテストが失敗する。
+- 6.1 の PageKit は src/site/ui/pages/page-kit.ts の mountPageKit(spec, container, context, deps?)。PageSpec は id・defaults・defaultSelection?(相対誤差型は {metric:"relative",pick:{kind:"max"}})・errorSelector?・toJob・validate・createControls(host)(host.update(prev => next) で条件を変える。showIssues に FieldIssue[] を渡す)・buildView(result, condition, selection)(戻りは {charts, extras?} または null)・createExplainer? を持つ。reasonFor と distributionIssues(data.distribution. を外す)を公開している。画面の事前判定は HDR の項を含まないので、HDR による上限超過は Worker が over-limit で返す。ComputeClient に取り消しはなく、無効に変えた直後でも待ち合わせ中の依頼は送られ、結果は捨てられる。extras は誤差の選択のたびに作り直される。
