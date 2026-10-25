@@ -104,6 +104,23 @@ function referenceDatasets(spec: ChartSpec): ChartDataset[] {
   return out;
 }
 
+/**
+ * 棒の系列が同じ項目に 2 本以上重ならないか。重ならなければ棒を項目の枠の中央に太く描ける
+ * (系列ごとに別の dataset なので、既定の grouped では各項目の枠の中で左に寄って細く描かれる)。
+ */
+function barsAreDisjoint(spec: ChartSpec): boolean {
+  const seen = new Set<string>();
+  for (const s of spec.series) {
+    if (s.kind !== 'bar') continue;
+    for (const p of s.points) {
+      const key = String(p.x);
+      if (seen.has(key)) return false;
+      seen.add(key);
+    }
+  }
+  return true;
+}
+
 /** ChartSpec(prepareForScale 済み)から Chart.js の設定を作る */
 export function buildChartConfig(spec: ChartSpec, animate: boolean): ChartConfiguration {
   const categorical = isCategorical(spec);
@@ -116,6 +133,7 @@ export function buildChartConfig(spec: ChartSpec, animate: boolean): ChartConfig
       maintainAspectRatio: false,
       animation: animate ? { duration: 300 } : false,
       parsing: false,
+      ...(categorical && barsAreDisjoint(spec) ? { datasets: { bar: { grouped: false, barPercentage: 0.6, categoryPercentage: 1 } } } : {}),
       interaction: { mode: 'nearest', intersect: true },
       scales: {
         x: {
@@ -128,7 +146,8 @@ export function buildChartConfig(spec: ChartSpec, animate: boolean): ChartConfig
         },
       },
       plugins: {
-        legend: { display: true },
+        // 凡例は小さめにして、狭い画面(320px)でもプロットの領域を残す(10.8)
+        legend: { display: true, labels: { boxWidth: 24, boxHeight: 10, padding: 8, font: { size: 11 } } },
         title: { display: false },
         tooltip: {
           callbacks: {

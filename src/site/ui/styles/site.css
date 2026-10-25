@@ -219,6 +219,12 @@ fieldset.control {
   width: 100%;
 }
 
+.control-row input[type='number'] {
+  /* 既定の幅は step の値などで変わり、スライダーを 0 幅に潰すので固定する */
+  flex: 0 0 7.5em;
+  width: 7.5em;
+}
+
 .control-row output {
   min-width: 5em;
   text-align: right;
@@ -458,7 +464,8 @@ button[aria-pressed='true'] {
   }
 
   .chart-canvas-frame {
-    height: 280px;
+    /* 凡例と軸の項目名で縦が埋まらないよう、1 列の狭い画面では高さを広げる */
+    height: 420px;
   }
 
   .control-row {

@@ -147,6 +147,31 @@ describe('buildChartConfig', () => {
     expect(cfg.data.labels).toEqual(cats);
   });
 
+  it('category 軸の棒が項目ごとに 1 本なら grouped: false で項目の中央に描く', () => {
+    const cats = ['甲', '乙'];
+    const cfg = buildChartConfig(
+      spec({
+        series: cats.map((c, i) => series(`s${i}`, { kind: 'bar', points: [{ x: c, y: i + 1 }] })),
+        x: { label: '手法', unit: '', scale: 'linear', toggleable: false },
+      }),
+      true,
+    );
+    const bar = (cfg.options as unknown as { datasets?: { bar?: { grouped?: boolean } } }).datasets?.bar;
+    expect(bar?.grouped).toBe(false);
+  });
+
+  it('同じ項目に棒が重なる場合と数値の x では grouped を変えない', () => {
+    const cfg = buildChartConfig(
+      spec({
+        series: ['a', 'b'].map((l) => series(l, { kind: 'bar', points: [{ x: '甲', y: 1 }] })),
+        x: { label: '手法', unit: '', scale: 'linear', toggleable: false },
+      }),
+      true,
+    );
+    expect((cfg.options as unknown as { datasets?: unknown }).datasets).toBeUndefined();
+    expect((buildChartConfig(spec(), true).options as unknown as { datasets?: unknown }).datasets).toBeUndefined();
+  });
+
   it('数値の x では labels を付けない', () => {
     expect(buildChartConfig(spec(), true).data.labels).toBeUndefined();
   });
