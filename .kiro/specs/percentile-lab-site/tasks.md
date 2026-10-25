@@ -196,7 +196,7 @@
   - _Boundary: PageKit_
   - _Requirements: 2.4, 2.5, 2.6, 2.9, 3.5, 3.7_
 
-- [ ] 6.2 (P) 厳密解とヒストグラムのページを組み立てる
+- [x] 6.2 (P) 厳密解とヒストグラムのページを組み立てる
   - 共通の条件、バケット数、境界の決め方、範囲の決め方(固定のときは下限・上限)の操作部品を置き、ヒストグラムの表示と解説(厳密解 2 方式、等幅、指数幅)と手引きをつなぐ
   - 完了時の状態: 偽の計算の窓口と記録した結果で、グラフ、条件の表示、注記、解説が出て、操作の変更で条件が依頼に写ることの DOM 環境のテストが通る
   - _Depends: 4.1, 6.1_
@@ -260,3 +260,4 @@
 - 5.4: 6.1 の PageKit は最後に依頼した JobRequest を保持し、done の状態を受け取った時点で ConditionSummary.show(job, result) を呼ぶ(ComputeStatus は job を持たない)。再実行ボタンは exception の失敗だけに出る。Explainer の見出しは h2(節)・h3(手法名)・h4(4 項目)で、ページの題名を h1 とする前提。5.5 のレイアウトは h1 を 1 つ、結果と操作の領域を h2 にする。5.4 の部品が使う CSS の class は status-bar・status-pending・status-failed・condition-summary・state-table(-scroll・-notice・-gap・-rejected・-facts)・explainer(-item・-algorithms・-guide)・control-error-selector。state-table-scroll は overflow: auto が必要。
 - 5.5: 7.1 の main.ts は ./ui/styles/site.css を import し、startRouter(root, { store: createConditionStore(), announce, createCompute }) を呼ぶ。PAGES の 4 つの準備中ページを 6.2〜6.5 に差し替える。2 列の骨組みは .page-columns・.page-controls・.page-results(site.css に定義済み)。ConditionStore は同じ参照を保存・返却するので、ページは保存した条件を書き換えない。--border の色は白に対して約 2.1:1(非テキストの 3:1 に満たない)。スキップリンクは未実装(要件になし)。ページを実装する 6.x が site.css に無い class を使うとクラス走査のテストが失敗する。
 - 6.1 の PageKit は src/site/ui/pages/page-kit.ts の mountPageKit(spec, container, context, deps?)。PageSpec は id・defaults・defaultSelection?(相対誤差型は {metric:"relative",pick:{kind:"max"}})・errorSelector?・toJob・validate・createControls(host)(host.update(prev => next) で条件を変える。showIssues に FieldIssue[] を渡す)・buildView(result, condition, selection)(戻りは {charts, extras?} または null)・createExplainer? を持つ。reasonFor と distributionIssues(data.distribution. を外す)を公開している。画面の事前判定は HDR の項を含まないので、HDR による上限超過は Worker が over-limit で返す。ComputeClient に取り消しはなく、無効に変えた直後でも待ち合わせ中の依頼は送られ、結果は捨てられる。extras は誤差の選択のたびに作り直される。
+- 6.2: 共通のデータ条件の操作部品は src/site/ui/pages/data-controls.ts の createDataControls({ idPrefix, host: { initial: DataCondition, update(fn) } }) → { elements: [分布, 件数, シード, 順序], setValue(data)(update を呼ばない), showIssues(issues)(data.distribution.*・data.count・data.seed・data.order を対応づけ、古い理由を消す) }。ページは host.update(c => ({...c, data: fn(c.data)})) で包んで使い、ページごとに別の idPrefix を渡す(hist-・stream-・rel-・cmp- など。分布の部品の id は固定で、同時に 2 ページは載らない)。ページのモジュールは histogramPage(id histogram・path /histogram)をエクスポートし、page-registry.ts は 7.1 で差し替える。テスト用に histogramPageSpec と mountHistogramPage(container, context, deps) も公開している。
