@@ -203,7 +203,7 @@
   - _Boundary: HistogramPage_
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 9.2, 9.6_
 
-- [ ] 6.3 (P) ストリーミング分位点のページを組み立てる
+- [x] 6.3 (P) ストリーミング分位点のページを組み立てる
   - 手法の選択、ε・k・δ(上流の範囲)、スケール関数、試行の回数、内部状態の対象の操作部品を置き、ストリーミングの表示、内部状態の図と表、解説(GK、KLL、t-digest)と手引きをつなぐ
   - 完了時の状態: 偽の計算の窓口と記録した結果で、グラフ、ε の基準線、内部状態の図と表、解説が出て、手法の選択が 0 件のとき理由が出て依頼しないことの DOM 環境のテストが通る
   - _Depends: 4.2, 6.1_
@@ -261,3 +261,4 @@
 - 5.5: 7.1 の main.ts は ./ui/styles/site.css を import し、startRouter(root, { store: createConditionStore(), announce, createCompute }) を呼ぶ。PAGES の 4 つの準備中ページを 6.2〜6.5 に差し替える。2 列の骨組みは .page-columns・.page-controls・.page-results(site.css に定義済み)。ConditionStore は同じ参照を保存・返却するので、ページは保存した条件を書き換えない。--border の色は白に対して約 2.1:1(非テキストの 3:1 に満たない)。スキップリンクは未実装(要件になし)。ページを実装する 6.x が site.css に無い class を使うとクラス走査のテストが失敗する。
 - 6.1 の PageKit は src/site/ui/pages/page-kit.ts の mountPageKit(spec, container, context, deps?)。PageSpec は id・defaults・defaultSelection?(相対誤差型は {metric:"relative",pick:{kind:"max"}})・errorSelector?・toJob・validate・createControls(host)(host.update(prev => next) で条件を変える。showIssues に FieldIssue[] を渡す)・buildView(result, condition, selection)(戻りは {charts, extras?} または null)・createExplainer? を持つ。reasonFor と distributionIssues(data.distribution. を外す)を公開している。画面の事前判定は HDR の項を含まないので、HDR による上限超過は Worker が over-limit で返す。ComputeClient に取り消しはなく、無効に変えた直後でも待ち合わせ中の依頼は送られ、結果は捨てられる。extras は誤差の選択のたびに作り直される。
 - 6.2: 共通のデータ条件の操作部品は src/site/ui/pages/data-controls.ts の createDataControls({ idPrefix, host: { initial: DataCondition, update(fn) } }) → { elements: [分布, 件数, シード, 順序], setValue(data)(update を呼ばない), showIssues(issues)(data.distribution.*・data.count・data.seed・data.order を対応づけ、古い理由を消す) }。ページは host.update(c => ({...c, data: fn(c.data)})) で包んで使い、ページごとに別の idPrefix を渡す(hist-・stream-・rel-・cmp- など。分布の部品の id は固定で、同時に 2 ページは載らない)。ページのモジュールは histogramPage(id histogram・path /histogram)をエクスポートし、page-registry.ts は 7.1 で差し替える。テスト用に histogramPageSpec と mountHistogramPage(container, context, deps) も公開している。
+- 6.3: streamingPage(id streaming・path /streaming・idPrefix stream)を src/site/ui/pages/streaming-page.ts からエクスポート。内部状態の図のグラフ id は対象に応じて streaming-inspect-gk|kll|tdigest と変わるため、対象を切り替えると PageKit が全パネルを作り直す(軸の切り替えは初期化される)。ε・k・δ・スケール関数の部品は手法を選んでいなくても出したままにする。
