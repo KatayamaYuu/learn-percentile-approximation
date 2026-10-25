@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { err, generate, runSweep, type BenchmarkInput, type Distribution } from '../core';
+import {
+  err,
+  generate,
+  runSweep,
+  seriesByAlgorithm,
+  type AlgorithmResult,
+  type BenchmarkInput,
+  type Distribution,
+} from '../core';
 import * as core from '../core';
 import { streamingSketchSpec, type StreamingSketchConfig } from './config';
 import { runStreamingExperiment, type StreamingExperimentSpec } from './experiment';
@@ -587,5 +595,193 @@ describe('検証の順序と、部分的な結果を返さないこと(7.8)', ()
     expect(r).not.toHaveProperty('value');
     expect(r).toEqual({ ok: false, error: { kind: 'harness', error: { kind: 'invalid-data', reason: 'empty' } } });
     expect(vi.mocked(runSweep)).toHaveBeenCalledTimes(2);
+  });
+});
+
+/** 処理時間(elapsedMs)だけを 0 にそろえた、JSON 相当の写し */
+function withoutTiming<T>(value: T): unknown {
+  return JSON.parse(JSON.stringify(value), (key, v) => (key === 'elapsedMs' ? 0 : v));
+}
+
+function okAlgorithm(a: AlgorithmResult) {
+  if (a.status !== 'ok') throw new Error(`algorithm ${a.id} failed`);
+  return a;
+}
+
+/** 試行のシードに依らない部分(結果の本体)。run の seed と meta の trial は含めない */
+function outcome(a: AlgorithmResult) {
+  const ok = okAlgorithm(a);
+  return withoutTiming({
+    id: ok.id,
+    queries: ok.queries,
+    afterInsertion: ok.afterInsertion,
+    afterQueries: ok.afterQueries,
+  });
+}
+
+describe('挿入順序と試行のシード(7.2、7.3)', () => {
+  const spec: StreamingExperimentSpec = {
+    cases: [{ label: 'lognormal', distribution: lognormal }],
+    counts: [300],
+    seed: 7,
+    orders: ['random', 'ascending', 'descending'],
+    trialSeeds: [1, 2, 3],
+    quantiles: [0.25, 0.5, 0.9, 0.99],
+    sketches: [
+      { kind: 'gk', epsilon: 0.05 },
+      { kind: 'kll', k: 8 },
+      { kind: 'tdigest', compression: 20, scale: 'k1' },
+    ],
+  };
+
+  function algorithmsOf(result: ReturnType<typeof run>, order: string) {
+    const c = result.cases.find((x) => x.order === order)!;
+    return c.sweep.runs.map((r) => r.algorithms);
+  }
+
+  it('挿入順序の違う条件のデータは、同じ値の集まりを順序だけ変えたもの', () => {
+    vi.mocked(generate).mockClear();
+    run(spec);
+    const sorted = (data: Float64Array | readonly number[]) => Float64Array.from(data).sort();
+    const calls = vi.mocked(generate).mock.calls.map((c) => c[0]);
+    const data = vi
+      .mocked(generate)
+      .mock.results.map((r) => (r.type === 'return' && r.value.ok ? r.value.value : null));
+    expect(calls.map((c) => c.order)).toEqual(['random', 'ascending', 'descending']);
+    const [random, ascending, descending] = data as Float64Array[];
+    expect(random).toHaveLength(300);
+    // 順序は実際に異なり、昇順・降順は整列済み、ランダムはどちらでもない
+    expect(Array.from(random!)).not.toEqual(Array.from(ascending!));
+    expect(Array.from(ascending!)).toEqual(Array.from(sorted(ascending!)));
+    expect(Array.from(descending!)).toEqual(Array.from(ascending!).reverse());
+    expect(Array.from(random!)).not.toEqual(Array.from(descending!));
+    // 値の集まりは同じ
+    expect(Array.from(sorted(random!))).toEqual(Array.from(ascending!));
+    expect(Array.from(sorted(descending!))).toEqual(Array.from(ascending!));
+  });
+
+  it('同じ値の集まりなので、順序によらず厳密解(基準)は等しく、指定した順序が結果に記録される', () => {
+    const r = run(spec);
+    const exactEstimates = (order: string) =>
+      algorithmsOf(r, order).map((algorithms) =>
+        algorithms.slice(0, 2).map((a) => okAlgorithm(a).queries.map((q) => [q.quantile, q.estimate, q.exact])),
+      );
+    expect(exactEstimates('ascending')).toEqual(exactEstimates('random'));
+    expect(exactEstimates('descending')).toEqual(exactEstimates('random'));
+    for (const c of r.cases) {
+      for (const x of c.sweep.runs) expect(x.meta.order).toBe(c.order);
+    }
+  });
+
+  it('GK と t-digest は試行のシードによらず同じ結果、KLL は試行のシードで結果が異なる', () => {
+    const r = run(spec);
+    for (const order of ['random', 'ascending', 'descending']) {
+      const trials = algorithmsOf(r, order);
+      expect(trials).toHaveLength(3);
+      for (const id of ['gk-eps-0.05', 'tdigest-k1-c20']) {
+        const results = trials.map((algorithms) => outcome(algorithms.find((a) => a.id === id)!));
+        expect(results[1]).toEqual(results[0]);
+        expect(results[2]).toEqual(results[0]);
+      }
+      const kll = trials.map((algorithms) => outcome(algorithms.find((a) => a.id === 'kll-k-8')!));
+      expect(new Set(kll.map((x) => JSON.stringify(x))).size).toBeGreaterThan(1);
+    }
+  });
+
+  it('KLL も同じ試行のシードなら同じ結果になる(シードの値を並べ替えても、シードごとの結果は変わらない)', () => {
+    const forward = run(spec).cases[0]!.sweep.runs;
+    const reversed = run({ ...spec, trialSeeds: [3, 2, 1] }).cases[0]!.sweep.runs;
+    const bySeed = (runs: typeof forward) =>
+      new Map(runs.map((x) => [x.seed, outcome(x.algorithms.find((a) => a.id === 'kll-k-8')!)]));
+    const a = bySeed(forward);
+    const b = bySeed(reversed);
+    expect([...a.keys()].sort()).toEqual([1, 2, 3]);
+    for (const seed of [1, 2, 3]) expect(b.get(seed)).toEqual(a.get(seed));
+  });
+});
+
+describe('処理時間を除く再現性(7.6)', () => {
+  it('同じ実験条件の再実行は、処理時間を除いてすべての項目が同じ', () => {
+    expect(withoutTiming(run(base))).toEqual(withoutTiming(run(base)));
+  });
+
+  it('処理時間を除くと等しい比較が、データのシード・試行のシードの違いは検出できる', () => {
+    const baseline = withoutTiming(run(base));
+    expect(withoutTiming(run({ ...base, seed: 8 }))).not.toEqual(baseline);
+    expect(withoutTiming(run({ ...base, trialSeeds: [12, 5] }))).not.toEqual(baseline);
+  });
+
+  it('処理時間は結果に残っていて、比較から除かれるのは elapsedMs だけ', () => {
+    const r = run(base);
+    const first = okAlgorithm(r.cases[0]!.sweep.runs[0]!.algorithms[2]!);
+    expect(typeof first.afterInsertion.elapsedMs).toBe('number');
+    expect(typeof first.queries[0]!.elapsedMs).toBe('number');
+  });
+});
+
+describe('系列化(7.4、7.1)', () => {
+  const spec: StreamingExperimentSpec = {
+    cases: [{ label: 'uniform', distribution: uniform }],
+    counts: [400, 100, 200],
+    seed: 3,
+    orders: ['random', 'descending'],
+    trialSeeds: [5],
+    quantiles: [0.5, 0.99],
+    sketches: base.sketches,
+  };
+  const ids = ['gk-eps-0.05', 'kll-k-16', 'tdigest-k1-c20'];
+
+  it('件数をまたいで手法ごとの系列に件数順で並ぶ(入力の件数の並びによらない)', () => {
+    const r = run(spec);
+    for (const c of r.cases) {
+      const series = seriesByAlgorithm(c.sweep);
+      const keys = Object.keys(series);
+      expect(keys).toHaveLength(2 + ids.length);
+      expect(keys.slice(2)).toEqual(ids);
+      expect(keys[0]).toMatch(/^exact-sort/);
+      expect(keys[1]).toMatch(/^exact-quickselect/);
+      for (const key of keys) {
+        const points = series[key]!;
+        expect(points.map((p) => p.count)).toEqual([100, 200, 400]);
+        for (const p of points) expect(p.result.id).toBe(key);
+      }
+    }
+  });
+
+  it('すべての件数・すべての手法にメモリ見積もりと誤差が入っている', () => {
+    const r = run(spec);
+    for (const c of r.cases) {
+      for (const points of Object.values(seriesByAlgorithm(c.sweep))) {
+        expect(points).toHaveLength(3);
+        for (const p of points) {
+          const a = okAlgorithm(p.result);
+          expect(Number.isFinite(a.afterQueries.memoryBytes)).toBe(true);
+          expect(a.afterQueries.memoryBytes).toBeGreaterThan(0);
+          expect(a.afterInsertion.memoryBytes).toBeGreaterThan(0);
+          expect(a.queries.map((q) => q.quantile)).toEqual([0.5, 0.99]);
+          for (const q of a.queries) {
+            for (const e of [q.absoluteError, q.relativeError, q.rankError]) {
+              expect(Number.isFinite(e)).toBe(true);
+              expect(e).toBeGreaterThanOrEqual(0);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('試行が複数あると同じ件数に複数の点が並び、BenchmarkResult の seed で区別できる', () => {
+    const r = run({ ...spec, counts: [100, 200], orders: ['random'], trialSeeds: [9, 4] });
+    const c = r.cases[0]!;
+    expect(c.sweep.runs.map((x) => [x.count, x.seed])).toEqual([
+      [100, 9],
+      [100, 4],
+      [200, 9],
+      [200, 4],
+    ]);
+    const series = seriesByAlgorithm(c.sweep);
+    for (const points of Object.values(series)) {
+      expect(points.map((p) => p.count)).toEqual([100, 100, 200, 200]);
+    }
   });
 });
