@@ -16,7 +16,7 @@ import {
 } from '../core';
 import { createDDSketch, ddsketchSpec } from './ddsketch';
 import type { RelativeErrorExperimentError } from './errors';
-import { hdrSpec } from './hdr-histogram';
+import { createHdrHistogram, hdrSpec } from './hdr-histogram';
 import { createHdrLayout } from './hdr-layout';
 
 export interface HdrRange {
@@ -111,23 +111,65 @@ function validateSpec(spec: RelativeErrorExperimentSpec): RelativeErrorExperimen
   return undefined;
 }
 
-/** 検証済みの設定から、厳密解 2 方式 → DDSketch → HDR の順に SketchSpec を並べる */
-function buildSketches(spec: RelativeErrorExperimentSpec, hdrRange: HdrRange): SketchSpec[] {
+/** 観察用のインスタンスに全件を投入し、バケットの統計を作る(1 件でも拒否されたら rejected) */
+type BucketObserver = (data: Float64Array, count: number) => BucketStatsRecord;
+
+interface Plan {
+  readonly sketches: SketchSpec[];
+  /** sketches のうち厳密解を除いた並びに対応する */
+  readonly observers: BucketObserver[];
+}
+
+/** 検証済みの設定から、厳密解 2 方式 → DDSketch → HDR の順に SketchSpec と観察用の関数を並べる */
+function buildPlan(spec: RelativeErrorExperimentSpec, hdrRange: HdrRange): Plan {
   const exactOptions = spec.referenceDefinition === undefined ? undefined : { definition: spec.referenceDefinition };
   const sketches: SketchSpec[] = [sortExactSpec(exactOptions), quickselectExactSpec(exactOptions)];
+  const observers: BucketObserver[] = [];
   for (const alpha of ascending(spec.alphas)) {
     for (const maxBuckets of ascending(spec.maxBucketsList)) {
       const s = ddsketchSpec({ alpha, maxBuckets });
       if (!s.ok) throw new Error('検証済みの DDSketch 設定が不正です');
       sketches.push(s.value);
+      const sketchId = s.value.id;
+      observers.push((data, count) => {
+        // 乱数を使わないので、ハーネス内のインスタンスと同じ状態になる
+        const sketch = createDDSketch({ alpha, maxBuckets });
+        if (!sketch.ok) throw new Error('検証済みの DDSketch 設定が不正です');
+        for (const x of data) if (!sketch.value.insert(x).ok) return { status: 'rejected', count, sketchId };
+        const snap = sketch.value.inspect();
+        return {
+          status: 'ok',
+          count,
+          sketchId,
+          bucketCount: snap.span,
+          nonEmptyBuckets: snap.nonEmptyBuckets,
+          collapsed: snap.collapsed,
+        };
+      });
     }
   }
   for (const significantDigits of ascending(spec.significantDigitsList)) {
-    const s = hdrSpec({ ...hdrRange, significantDigits });
+    const config = { ...hdrRange, significantDigits };
+    const s = hdrSpec(config);
     if (!s.ok) throw new Error('検証済みの HDR 設定が不正です');
     sketches.push(s.value);
+    const sketchId = s.value.id;
+    observers.push((data, count) => {
+      const sketch = createHdrHistogram(config);
+      if (!sketch.ok) throw new Error('検証済みの HDR 設定が不正です');
+      for (const x of data) if (!sketch.value.insert(x).ok) return { status: 'rejected', count, sketchId };
+      const snap = sketch.value.inspect();
+      return {
+        status: 'ok',
+        count,
+        sketchId,
+        bucketCount: snap.totalBuckets,
+        nonEmptyBuckets: snap.nonEmptyBuckets,
+        collapsed: null,
+      };
+    });
   }
-  return sketches;
+  return { sketches, observers };
 }
 
 /**
@@ -147,6 +189,7 @@ export function runRelativeErrorExperiment(
 
   for (const experimentCase of spec.cases) {
     const conditions: BenchmarkInput[] = [];
+    const statsByCondition: { readonly count: number; readonly stats: BucketStatsRecord[] }[] = [];
     for (const count of spec.counts) {
       const generated = generate({ distribution: experimentCase.distribution, count, seed: spec.seed, order });
       if (!generated.ok) return err({ kind: 'generate', error: generated.error });
@@ -157,10 +200,12 @@ export function runRelativeErrorExperiment(
         hdrLowest: experimentCase.hdrRange.lowest,
         hdrHighest: experimentCase.hdrRange.highest,
       };
+      const plan = buildPlan(spec, experimentCase.hdrRange);
+      statsByCondition.push({ count, stats: plan.observers.map((observe) => observe(generated.value, count)) });
       conditions.push({
         data: generated.value,
         quantiles: spec.quantiles,
-        sketches: buildSketches(spec, experimentCase.hdrRange),
+        sketches: plan.sketches,
         seed: spec.seed,
         ...(spec.referenceDefinition === undefined ? {} : { referenceDefinition: spec.referenceDefinition }),
         meta,
@@ -168,7 +213,13 @@ export function runRelativeErrorExperiment(
     }
     const sweep = runSweep(conditions);
     if (!sweep.ok) return err({ kind: 'harness', error: sweep.error });
-    cases.push({ label: experimentCase.label, sweep: sweep.value, bucketStats: [] });
+    // ハーネスの結果(件数の昇順、同じ件数は入力の並び)と同じ並びにそろえる。Array.prototype.sort は安定
+    statsByCondition.sort((a, b) => a.count - b.count);
+    cases.push({
+      label: experimentCase.label,
+      sweep: sweep.value,
+      bucketStats: statsByCondition.flatMap((c) => c.stats),
+    });
   }
   return ok({ schemaVersion: 1, cases });
 }

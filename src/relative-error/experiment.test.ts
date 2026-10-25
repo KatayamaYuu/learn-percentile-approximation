@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { seriesByAlgorithm, withoutTiming } from '../core';
+import { generate, seriesByAlgorithm, withoutTiming } from '../core';
+import { createDDSketch } from './ddsketch';
+import { createHdrHistogram } from './hdr-histogram';
 import { runRelativeErrorExperiment, type RelativeErrorExperimentSpec } from './experiment';
 
 const BASE: RelativeErrorExperimentSpec = {
@@ -139,5 +141,137 @@ describe('再現性', () => {
     for (let i = 0; i < a.cases.length; i++) {
       expect(a.cases[i]!.sweep.runs.map(withoutTiming)).toEqual(b.cases[i]!.sweep.runs.map(withoutTiming));
     }
+  });
+});
+
+describe('バケットの統計', () => {
+  it('件数の昇順、同じ件数では sketch の並びで、観察結果と一致する', () => {
+    const result = run(BASE);
+    const ddIds = ['ddsketch-a0.01-m16', 'ddsketch-a0.01-m64', 'ddsketch-a0.05-m16', 'ddsketch-a0.05-m64'];
+    const ids = [...ddIds, 'hdr-d1', 'hdr-d2'];
+    for (const c of result.cases) {
+      expect(c.bucketStats.map((s) => [s.count, s.sketchId])).toEqual(
+        [100, 300].flatMap((count) => ids.map((id) => [count, id])),
+      );
+      for (const stat of c.bucketStats) {
+        expect(stat.status).toBe('ok');
+        const r = c.sweep.runs.find((run) => run.count === stat.count)!;
+        // バケットの統計は、同じ識別子の計測結果と対応づけられる
+        expect(r.algorithms.some((a) => a.id === stat.sketchId)).toBe(true);
+      }
+    }
+    const spec = BASE.cases[0]!;
+    const data = (count: number) => {
+      const g = generate({ distribution: spec.distribution, count, seed: 1, order: 'random' });
+      if (!g.ok) throw new Error();
+      return g.value;
+    };
+    const dd = createDDSketch({ alpha: 0.05, maxBuckets: 16 });
+    const hdr = createHdrHistogram({ ...spec.hdrRange, significantDigits: 2 });
+    if (!dd.ok || !hdr.ok) throw new Error();
+    for (const x of data(300)) {
+      dd.value.insert(x);
+      hdr.value.insert(x);
+    }
+    const stats = result.cases[0]!.bucketStats;
+    const ddStat = stats.find((s) => s.count === 300 && s.sketchId === 'ddsketch-a0.05-m16');
+    const hdrStat = stats.find((s) => s.count === 300 && s.sketchId === 'hdr-d2');
+    const ddSnap = dd.value.inspect();
+    const hdrSnap = hdr.value.inspect();
+    expect(ddStat).toEqual({
+      status: 'ok',
+      count: 300,
+      sketchId: 'ddsketch-a0.05-m16',
+      bucketCount: ddSnap.span,
+      nonEmptyBuckets: ddSnap.nonEmptyBuckets,
+      collapsed: ddSnap.collapsed,
+    });
+    expect(hdrStat).toEqual({
+      status: 'ok',
+      count: 300,
+      sketchId: 'hdr-d2',
+      bucketCount: hdrSnap.totalBuckets,
+      nonEmptyBuckets: hdrSnap.nonEmptyBuckets,
+      collapsed: null,
+    });
+    // m = 16 では縮約が起きる
+    expect(ddStat && ddStat.status === 'ok' && ddStat.collapsed).toBe(true);
+  });
+
+  it('件数が昇順でない入力でも、結果の並びと統計の並びが対応する', () => {
+    const r = run({ ...BASE, counts: [300, 100, 200] });
+    expect(r.cases[0]!.sweep.runs.map((x) => x.count)).toEqual([100, 200, 300]);
+    expect(r.cases[0]!.bucketStats.filter((s) => s.sketchId === 'hdr-d1').map((s) => s.count)).toEqual([100, 200, 300]);
+  });
+});
+
+describe('HDR の範囲がデータを覆わない場合', () => {
+  const narrow: RelativeErrorExperimentSpec = {
+    ...BASE,
+    cases: [
+      { label: 'narrow', distribution: { kind: 'lognormal', mu: 3, sigma: 1 }, hdrRange: { lowest: 1, highest: 20 } },
+    ],
+    counts: [200],
+  };
+
+  it('HDR だけが投入段階のエラーになり、統計は rejected で、他は続行する', () => {
+    const c = run(narrow).cases[0]!;
+    const algorithms = c.sweep.runs[0]!.algorithms;
+    for (const a of algorithms) {
+      if (a.id.startsWith('hdr-')) {
+        expect(a).toMatchObject({ status: 'error', stage: 'insert', errorKind: 'unsupported-value' });
+      } else {
+        expect(a.status).toBe('ok');
+      }
+    }
+    for (const s of c.bucketStats) {
+      expect(s.status).toBe(s.sketchId.startsWith('hdr-') ? 'rejected' : 'ok');
+    }
+    expect(JSON.parse(JSON.stringify(c))).toEqual(c);
+  });
+});
+
+describe('設定と件数による変化', () => {
+  const spec: RelativeErrorExperimentSpec = {
+    cases: [
+      { label: 'ln', distribution: { kind: 'lognormal', mu: 3, sigma: 2 }, hdrRange: { lowest: 0.001, highest: 1e7 } },
+    ],
+    counts: [200, 2000],
+    seed: 2,
+    quantiles: [0.5],
+    alphas: [0.1, 0.01],
+    maxBucketsList: [100_000],
+    significantDigitsList: [1, 3],
+    referenceDefinition: 'nearest-rank',
+  };
+
+  it('α を小さく・有効桁数を大きくすると、バケット数とメモリ見積もりが増える', () => {
+    const c = run(spec).cases[0]!;
+    const stat = (id: string, count: number) => {
+      const s = c.bucketStats.find((x) => x.sketchId === id && x.count === count);
+      if (!s || s.status !== 'ok') throw new Error(id);
+      return s;
+    };
+    const memory = (id: string, count: number): number => {
+      const a = c.sweep.runs.find((r) => r.count === count)!.algorithms.find((x) => x.id === id)!;
+      if (a.status !== 'ok') throw new Error(id);
+      return a.afterInsertion.memoryBytes;
+    };
+    expect(stat('ddsketch-a0.01-m100000', 2000).bucketCount).toBeGreaterThan(stat('ddsketch-a0.1-m100000', 2000).bucketCount);
+    expect(memory('ddsketch-a0.01-m100000', 2000)).toBeGreaterThan(memory('ddsketch-a0.1-m100000', 2000));
+    expect(stat('hdr-d3', 2000).bucketCount).toBeGreaterThan(stat('hdr-d1', 2000).bucketCount);
+    expect(memory('hdr-d3', 2000)).toBeGreaterThan(memory('hdr-d1', 2000));
+  });
+
+  it('件数を増やしても HDR のメモリ見積もりは増えず、厳密解は増える', () => {
+    const c = run(spec).cases[0]!;
+    const memory = (id: string, count: number): number => {
+      const a = c.sweep.runs.find((r) => r.count === count)!.algorithms.find((x) => x.id === id)!;
+      if (a.status !== 'ok') throw new Error(id);
+      return a.afterInsertion.memoryBytes;
+    };
+    expect(memory('hdr-d3', 2000)).toBe(memory('hdr-d3', 200));
+    const exactId = c.sweep.runs[0]!.algorithms[0]!.id;
+    expect(memory(exactId, 2000)).toBeGreaterThan(memory(exactId, 200));
   });
 });
