@@ -40,7 +40,7 @@
   - サイト基盤が各系統のページを取り込むための登録方法
 
 ## Specs (dependency order)
-- [ ] percentile-lab-core -- アルゴリズム共通IF、データ分布ジェネレータ、誤差・操作数・メモリ計測、厳密解(sort / quickselect)。Dependencies: none
+- [x] percentile-lab-core -- アルゴリズム共通IF、データ分布ジェネレータ、誤差・操作数・メモリ計測、厳密解(sort / quickselect)。Dependencies: none
 - [x] histogram-percentile -- 固定バケットのヒストグラム近似と線形補間、バケット幅と誤差の関係。Dependencies: percentile-lab-core
 - [ ] streaming-quantile-sketches -- GK、KLL、t-digest の実装と、ε・圧縮パラメータと誤差の関係。Dependencies: percentile-lab-core
 - [ ] relative-error-sketches -- DDSketch と HDR Histogram の実装と、相対誤差保証の挙動。Dependencies: percentile-lab-core
