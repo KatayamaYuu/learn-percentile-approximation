@@ -170,7 +170,7 @@
   - _Boundary: ChartPanel・ChartSetup_
   - _Requirements: 7.1, 7.3, 7.4, 10.3, 10.4, 10.7, 10.8, 11.5_
 
-- [ ] 5.4 (P) 状態表示、条件の表示、誤差の選択、内部状態の表、解説の表示を実装する
+- [x] 5.4 (P) 状態表示、条件の表示、誤差の選択、内部状態の表、解説の表示を実装する
   - 計算中(結果の領域を処理中にし、直前の条件の結果である旨を出す)、失敗(理由と再実行)、上限超過(上限と減らし方)を表示し、完了と失敗を支援技術に通知する
   - 結果を作った条件(分布とパラメータ、件数、シード、順序、手法のパラメータ、基準の定義、HDR の範囲)を、結果の受け取り時に表示する。指標と分位点の選択部品、表の省略の表示、解説の 4 項目・注意・文書名と手引きの表示を作る
   - 完了時の状態: 各状態の文言と再実行ボタン、通知の呼び出し、条件の表示の内容、解説の 4 項目の見出しが出ることの DOM 環境のテストが通る
@@ -257,3 +257,4 @@
 - 5.1 の ComputeClient は request()/retry() を this なしの関数として返す(ボタンに直接渡せる)。WorkerLike に省略可能な onmessageerror を足した。new Worker は ui/compute/worker-factory.ts の 1 か所だけで、Vite は main.ts がこれを参照する 7.1 で初めて Worker を組み立てる。
 - 5.2 の SliderOptions に省略可能な min・max・integer を足した(件数は 100〜1,000,000 の自由入力、格子の最大は現在の件数)。ページは COUNT_RANGE を渡す。createDistributionEditor の setParamIssue は上流の項目名(modes[1].stdDev)を受け、接頭辞 data.distribution. は呼び出し側(ページ)が外して渡す。分布全体の理由(modes など)は枠全体の理由に出る。CSS の class(field-reason・visually-hidden・control-*)は 5.5 のスタイルで定義する。
 - 5.3 のグラフ部品は src/site/ui/components/ にある(chart-setup・chart-styles・chart-renderer・chart-panel)。カテゴリ軸の棒は系列ごとに別の dataset なので、各カテゴリの枠の中で左に寄って描かれる(読み取りには支障なし。7.2 の目視で見て、必要なら barPercentage などで調整する)。パネルの CSS の class(chart-panel・chart-canvas-frame・chart-controls・chart-notes・chart-table-scroll など)は 5.5 で定義し、.chart-canvas-frame には高さが必要。パネルを main.ts から使うとメインの bundle は圧縮後およそ 62 KB。
+- 5.4: 6.1 の PageKit は最後に依頼した JobRequest を保持し、done の状態を受け取った時点で ConditionSummary.show(job, result) を呼ぶ(ComputeStatus は job を持たない)。再実行ボタンは exception の失敗だけに出る。Explainer の見出しは h2(節)・h3(手法名)・h4(4 項目)で、ページの題名を h1 とする前提。5.5 のレイアウトは h1 を 1 つ、結果と操作の領域を h2 にする。5.4 の部品が使う CSS の class は status-bar・status-pending・status-failed・condition-summary・state-table(-scroll・-notice・-gap・-rejected・-facts)・explainer(-item・-algorithms・-guide)・control-error-selector。state-table-scroll は overflow: auto が必要。
