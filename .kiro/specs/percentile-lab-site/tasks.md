@@ -114,7 +114,7 @@
   - _Requirements: 2.5, 3.1, 3.5, 3.6_
 
 - [ ] 4. 共有層: ページの結果から表示へ
-- [ ] 4.1 (P) ヒストグラムのページの表示を作る
+- [x] 4.1 (P) ヒストグラムのページの表示を作る
   - バケット数ごとの誤差(境界の決め方ごとの系列)、件数ごとの操作数とメモリ(厳密解 2 方式と現在のヒストグラム)、累積分布(厳密値の折れ線とヒストグラムの推定値の点)、分位点ごとの誤差のグラフの仕様を作る。厳密解は誤差のグラフに入れない
   - 完了時の状態: ジョブの結果から期待した枚数のグラフの仕様ができ、累積分布の点が詳細の厳密値と推定値に等しく、範囲外のヒストグラムが注記になることの単体テストが通る
   - _Depends: 2.5, 3.2_
@@ -250,3 +250,4 @@
 - 3.1 の error-map.ts は 3.2〜3.5 向けに histogramFieldMap・streamingFieldMap・relativeFieldMap・relativeCompareFieldMap を公開している。planHdr は 0〜5 の整数でない有効桁数を除外せず上流に渡して失敗させる。
 - 3.2・3.3 のジョブは、設計が orders を挙げない掃引でもデータ条件の順序(c.data.order)を上流に渡す(順序の操作と条件の表示を効かせるため)。ストリーミングの詳細の呼び出しだけが 3 つの順序をすべて使う。
 - 3.4 の runRelativePage は Result<RelativePageResult, JobFailure> を返す(設計どおり)。3.2・3.3 のジョブは FieldIssue[] の失敗を返すので、3.6 で invalid-condition に包む。3.5 の runCompare は 3.4 と同じ JobFailure を返す。
+- 4.1 の表示関数は ViewOptions を histogram-view.ts から公開している(selection のみ)。4.2〜4.4 はここから import するか、必要なら中立の場所に移す。表示関数は生の ChartSpec を返し、対数軸での 0 以下の除外は 5.3 のパネルが prepareForScale で行う。系列の表示名(日本語)は各 View が付ける。
