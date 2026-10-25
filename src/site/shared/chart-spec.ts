@@ -27,6 +27,8 @@ export interface SeriesSpec {
   readonly points: readonly ChartPoint[];
   /** 表示の形 */
   readonly kind: 'line' | 'scatter' | 'bar';
+  /** 真のとき破線で描く(保証の上限など、点ごとに値が変わる基準を系列として重ねるとき) */
+  readonly dashed?: boolean;
 }
 
 export interface ReferenceLine {
