@@ -178,3 +178,59 @@ describe('設定と SketchSpec', () => {
     }
   });
 });
+
+describe('inspect', () => {
+  it('全項目を返し、件数の合計は総件数、番号は昇順', () => {
+    const layout = createHdrLayout(CONFIG);
+    if (!layout.ok) throw new Error();
+    const l = layout.value;
+    const s = make();
+    load(s, [1, 1, 150, 999, 1000, 150]);
+    const snap = s.inspect();
+    expect(snap).toMatchObject({
+      kind: 'hdr',
+      lowest: 1,
+      highest: 1000,
+      significantDigits: 2,
+      subBucketCount: 256,
+      totalBuckets: l.totalBuckets,
+      totalCount: 6,
+      nonEmptyBuckets: 4,
+    });
+    expect(snap.buckets.map((b) => b.count)).toEqual([2, 2, 1, 1]);
+    expect(snap.buckets.reduce((a, b) => a + b.count, 0)).toBe(snap.totalCount);
+    const i150 = l.indexOf(150);
+    expect(snap.buckets[1]).toEqual({
+      index: i150,
+      lower: l.lowerBound(i150),
+      upper: l.upperBound(i150),
+      representative: l.representative(i150),
+      count: 2,
+    });
+    for (let i = 1; i < snap.buckets.length; i++) {
+      expect(snap.buckets[i]!.index).toBeGreaterThan(snap.buckets[i - 1]!.index);
+    }
+  });
+
+  it('空の観察、観察の前後で操作数・メモリ見積もりが同じ', () => {
+    const s = make();
+    expect(s.inspect()).toMatchObject({ totalCount: 0, nonEmptyBuckets: 0, buckets: [] });
+    load(s, [3, 30, 300]);
+    const ops = s.operationCounts();
+    const mem = s.memoryBytes();
+    s.inspect();
+    expect(s.operationCounts()).toEqual(ops);
+    expect(s.memoryBytes()).toBe(mem);
+  });
+
+  it('観察結果はその後の投入で変わらず、JSON を往復できる', () => {
+    const s = make();
+    load(s, [2, 20, 200]);
+    const snap = s.inspect();
+    const frozen = JSON.parse(JSON.stringify(snap));
+    expect(frozen).toEqual(snap);
+    load(s, [2, 2, 999]);
+    expect(snap).toEqual(frozen);
+    expect(s.inspect().totalCount).toBe(6);
+  });
+});

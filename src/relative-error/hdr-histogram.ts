@@ -80,7 +80,30 @@ function makeHdrHistogram(layout: HdrLayout): HdrHistogram {
     },
 
     inspect(): HdrSnapshot {
-      throw new Error('inspect は 3.4 で実装する');
+      // 計数器を使わず、件数が 1 以上のバケットだけを番号の昇順に並べた値を新しく組み立てる
+      const buckets: BucketView[] = [];
+      for (let index = 0; index < totalBuckets; index++) {
+        const count = counts[index]!;
+        if (count === 0) continue;
+        buckets.push({
+          index,
+          lower: layout.lowerBound(index),
+          upper: layout.upperBound(index),
+          representative: layout.representative(index),
+          count,
+        });
+      }
+      return {
+        kind: 'hdr',
+        lowest,
+        highest,
+        significantDigits: layout.significantDigits,
+        subBucketCount: layout.subBucketCount,
+        totalBuckets,
+        totalCount: total,
+        nonEmptyBuckets: buckets.length,
+        buckets,
+      };
     },
   };
 }
