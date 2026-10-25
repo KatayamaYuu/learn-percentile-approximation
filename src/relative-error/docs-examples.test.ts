@@ -10,10 +10,13 @@ const readDoc = (name: string): string => readFileSync(join(docsDir, name), 'utf
 const sig = (x: number, n = 6): string => String(Number(x.toPrecision(n)));
 
 /** 文書の表から、指定した先頭セルを持つ行のセルを取り出す */
-function rowOf(doc: string, firstCell: string): string[] {
-  const line = doc.split('\n').find((l) => l.startsWith(`| ${firstCell} |`));
-  if (line === undefined) throw new Error(`row not found: ${firstCell}`);
-  return line.split('|').slice(1, -1).map((c) => c.trim());
+function rowOf(doc: string, firstCell: string, width?: number): string[] {
+  for (const line of doc.split('\n')) {
+    if (!line.startsWith(`| ${firstCell} |`)) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    if (width === undefined || cells.length === width) return cells;
+  }
+  throw new Error(`row not found: ${firstCell}`);
 }
 
 describe('ddsketch.md の数値例', () => {
@@ -56,5 +59,50 @@ describe('ddsketch.md の数値例', () => {
     expect(doc).toContain('γ^2048 ≈ 6.16e17');
     expect(Number(Math.exp(64 * lg).toPrecision(3))).toBe(3.6);
     expect(doc).toContain('γ^64 ≈ 3.60');
+  });
+});
+
+describe('hdr-histogram.md の数値例', () => {
+  const doc = readDoc('hdr-histogram.md');
+  const layoutOf = (significantDigits: number) => {
+    const r = createHdrLayout({ lowest: 1, highest: 3_600_000, significantDigits });
+    if (!r.ok) throw new Error('layout');
+    return r.value;
+  };
+
+  it.each([0, 1, 2, 3, 4, 5])('d = %i の S、総数、メモリ見積もり', (d) => {
+    const l = layoutOf(d);
+    expect(rowOf(doc, String(d), 2)).toEqual([String(d), String(l.subBucketCount)]);
+    expect(doc).toContain(`| ${d} | ${l.subBucketCount} | ${l.totalBuckets} | ${(3 + l.totalBuckets + 1) * 8} |`);
+  });
+
+  it('d = 2 の S と総数', () => {
+    const l = layoutOf(2);
+    expect(rowOf(doc, 'S')).toEqual(['S', String(l.subBucketCount)]);
+    expect(rowOf(doc, 'バケットの総数')).toEqual(['バケットの総数', String(l.totalBuckets)]);
+    expect(l.totalBuckets).toBe(256 + 14 * 128);
+    expect(doc).toContain('`256 + 14 × 128 = 2048`');
+  });
+
+  it.each([1, 100, 150, 1_000_000])('値 %i の番号・境界・代表値', (x) => {
+    const l = layoutOf(2);
+    const i = l.indexOf(x);
+    expect(rowOf(doc, String(x), 5)).toEqual([
+      String(x),
+      String(i),
+      sig(l.lowerBound(i), 10),
+      sig(l.upperBound(i), 10),
+      sig(l.representative(i), 10),
+    ]);
+  });
+
+  it('本文中の誤差の数値', () => {
+    const l = layoutOf(2);
+    const rep = l.representative(l.indexOf(1_000_000));
+    expect(rep - 1_000_000).toBe(1472);
+    expect(sig(Math.abs(rep - 1_000_000) / 1_000_000, 2)).toBe('0.0015');
+    expect(sig(Math.abs(l.representative(l.indexOf(100)) - 100) / 100, 2)).toBe('0.005');
+    expect(sig(1 / l.subBucketCount, 2)).toBe('0.0039');
+    expect(l.upperBound(l.indexOf(1_000_000)) - l.lowerBound(l.indexOf(1_000_000))).toBe(4096);
   });
 });
