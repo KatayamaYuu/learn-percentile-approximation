@@ -154,7 +154,7 @@
   - _Boundary: ComputeClient・WorkerFactory_
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.6, 3.7_
 
-- [ ] 5.2 (P) 操作部品を実装する
+- [x] 5.2 (P) 操作部品を実装する
   - スライダー(離散値の列、数値の常時表示、読み上げ用の値と単位、範囲内の自由入力)、選択(単一・複数)、数値入力、分布の種類とパラメータの入力(多峰は 2 山を編集)、項目のそばの理由表示を、ネイティブの入力部品とラベルで作る
   - 受け付けない値では理由を出し、変更を通知しない
   - 完了時の状態: ラベルと読み上げ用の値があり、値が常に表示され、矢印キーの操作で値が変わり、受け付けない値で理由が出て変更が通知されないことの DOM 環境のテストが通る
@@ -255,3 +255,4 @@
 - 4.3 は SeriesSpec に省略可能な dashed?: boolean を足した(破線の系列)。5.3 のパネルは dashed の系列に破線の見た目を付ける。相対誤差型のページ(6.4)は誤差の選択の初期値を { metric: "relative", pick: { kind: "max" } } にして View に渡す(DEFAULT_ERROR_SELECTION は順位誤差)。基準線(α・1/S)は相対誤差の指標のときだけ出る。
 - 4.4 の ComparisonRow・CompareCharts・ELAPSED_REFERENCE_NOTE は compare-view.ts が公開している。比較表(6.5 の ComparePage)は ComparisonRow を列にする。
 - 5.1 の ComputeClient は request()/retry() を this なしの関数として返す(ボタンに直接渡せる)。WorkerLike に省略可能な onmessageerror を足した。new Worker は ui/compute/worker-factory.ts の 1 か所だけで、Vite は main.ts がこれを参照する 7.1 で初めて Worker を組み立てる。
+- 5.2 の SliderOptions に省略可能な min・max・integer を足した(件数は 100〜1,000,000 の自由入力、格子の最大は現在の件数)。ページは COUNT_RANGE を渡す。createDistributionEditor の setParamIssue は上流の項目名(modes[1].stdDev)を受け、接頭辞 data.distribution. は呼び出し側(ページ)が外して渡す。分布全体の理由(modes など)は枠全体の理由に出る。CSS の class(field-reason・visually-hidden・control-*)は 5.5 のスタイルで定義する。
