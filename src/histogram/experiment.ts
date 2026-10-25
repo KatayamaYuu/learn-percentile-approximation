@@ -24,7 +24,20 @@ export interface FixedRange {
   readonly upper: number;
 }
 
-export type BucketRange = FixedRange;
+/** 'data-extent' は、生成したデータの最小値と最大値を下限・上限にする(件数ごとに変わる) */
+export type BucketRange = FixedRange | 'data-extent';
+
+function resolveRange(range: BucketRange, data: Float64Array): FixedRange {
+  if (range !== 'data-extent') return range;
+  let lower = Infinity;
+  let upper = -Infinity;
+  for (let i = 0; i < data.length; i++) {
+    const x = data[i]!;
+    if (x < lower) lower = x;
+    if (x > upper) upper = x;
+  }
+  return { lower, upper };
+}
 
 export interface ExperimentCase {
   /** ケースの識別。実験内で重複させない */
@@ -126,13 +139,13 @@ export function runBucketExperiment(
     for (const count of spec.counts) {
       const generated = generate({ distribution: experimentCase.distribution, count, seed: spec.seed, order });
       if (!generated.ok) return err({ kind: 'generate', error: generated.error });
-      const sketches = buildSketches(spec, experimentCase.range, bucketCounts);
+      const sketches = buildSketches(spec, resolveRange(experimentCase.range, generated.value), bucketCounts);
       if (!sketches.ok) return err(sketches.error);
       const meta: ParamRecord = {
         case: experimentCase.label,
         distribution: experimentCase.distribution.kind,
         order,
-        rangeMode: 'fixed',
+        rangeMode: experimentCase.range === 'data-extent' ? 'data-extent' : 'fixed',
       };
       conditions.push({
         data: generated.value,

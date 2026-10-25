@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { seriesByAlgorithm, type BenchmarkResult } from '../core';
 import { runBucketExperiment, type BucketExperimentSpec } from './experiment';
 
 const base: BucketExperimentSpec = {
@@ -147,5 +148,135 @@ describe('不正な実験条件', () => {
 
   it('ハーネスの入力エラー', () => {
     expect(errorOf({ ...base, quantiles: [2] })).toEqual({ kind: 'harness', error: { kind: 'invalid-quantile' } });
+  });
+});
+
+describe('データの範囲による指定', () => {
+  const spec: BucketExperimentSpec = {
+    ...base,
+    cases: [{ label: 'extent', distribution: { kind: 'lognormal', mu: 0, sigma: 1 }, range: 'data-extent' }],
+    counts: [50, 500],
+  };
+
+  it('生成したデータの最小値と最大値が範囲になり、件数ごとに変わる', () => {
+    const r = run(spec);
+    const bounds = r.cases[0]!.sweep.runs.map((run) => {
+      const h = run.algorithms.find((a) => a.id === 'histogram-equal-20')!;
+      expect(h.params.lower).toBeLessThan(h.params.upper as number);
+      expect(run.meta.rangeMode).toBe('data-extent');
+      return [h.params.lower, h.params.upper];
+    });
+    expect(bounds[0]).not.toEqual(bounds[1]);
+  });
+
+  it('範囲が実データを覆うので、すべてのヒストグラムが成功する', () => {
+    const r = run(spec);
+    for (const run of r.cases[0]!.sweep.runs) {
+      for (const a of run.algorithms) expect(a.status).toBe('ok');
+    }
+  });
+
+  it('すべての値が等しく範囲が作れない場合は境界の誤り', () => {
+    // 1 件だけなら最小値と最大値が等しい
+    const e = errorOf({ ...spec, counts: [1] });
+    expect(e).toMatchObject({ kind: 'invalid-scheme', field: 'upper' });
+  });
+});
+
+describe('固定の範囲がデータを覆わない場合', () => {
+  const spec: BucketExperimentSpec = {
+    ...base,
+    cases: [
+      { label: 'narrow', distribution: { kind: 'uniform', min: 1, max: 100 }, range: { lower: 20, upper: 60 } },
+      { label: 'wide', distribution: { kind: 'uniform', min: 1, max: 100 }, range: { lower: 0.5, upper: 200 } },
+    ],
+    counts: [300],
+  };
+
+  it('ヒストグラムだけが投入段階の扱えない値のエラーとして記録され、厳密解と他のケースは続行する', () => {
+    const r = run(spec);
+    const narrow = r.cases[0]!.sweep.runs[0]!;
+    expect(narrow.algorithms).toHaveLength(6);
+    for (const a of narrow.algorithms.slice(0, 2)) expect(a.status).toBe('ok');
+    for (const a of narrow.algorithms.slice(2)) {
+      expect(a).toMatchObject({ status: 'error', stage: 'insert', errorKind: 'unsupported-value' });
+    }
+    const wide = r.cases[1]!.sweep.runs[0]!;
+    for (const a of wide.algorithms) expect(a.status).toBe('ok');
+  });
+
+  it('実験全体のエラーにはならず、JSON を往復しても等しい', () => {
+    const r = run(spec);
+    expect(JSON.parse(JSON.stringify(r))).toEqual(r);
+  });
+});
+
+describe('再現性と系列化', () => {
+  it('同じ条件の再実行は、処理時間を除いて同じ結果になる', () => {
+    const strip = (r: ReturnType<typeof run>) =>
+      JSON.parse(JSON.stringify(r), (key, value) => (key === 'elapsedMs' ? 0 : value));
+    expect(strip(run(base))).toEqual(strip(run(base)));
+  });
+
+  it('シードを変えると結果が変わる', () => {
+    const strip = (r: ReturnType<typeof run>) =>
+      JSON.parse(JSON.stringify(r), (key, value) => (key === 'elapsedMs' ? 0 : value));
+    expect(strip(run({ ...base, seed: 8 }))).not.toEqual(strip(run(base)));
+  });
+
+  it('件数をまたいでも、同じ識別の系列に件数順で並ぶ(データの範囲が件数ごとに変わっても)', () => {
+    const r = run({
+      ...base,
+      cases: [{ label: 'extent', distribution: { kind: 'lognormal', mu: 0, sigma: 1 }, range: 'data-extent' }],
+      counts: [400, 100, 200],
+    });
+    const series = seriesByAlgorithm(r.cases[0]!.sweep);
+    expect(Object.keys(series)).toHaveLength(2 + 4);
+    for (const points of Object.values(series)) {
+      expect(points.map((p) => p.count)).toEqual([100, 200, 400]);
+    }
+  });
+});
+
+describe('件数・バケット数に対する費用の増え方', () => {
+  const spec: BucketExperimentSpec = {
+    cases: [{ label: 'u', distribution: { kind: 'uniform', min: 1, max: 100 }, range: { lower: 1, upper: 100 } }],
+    counts: [1000, 10000],
+    seed: 3,
+    // 分位点 1 は最後の非空バケットまで走査するので、問い合わせの比較がバケット数に応じて増える
+    quantiles: [1],
+    bucketCounts: [10, 100],
+    schemes: ['equal'],
+  };
+
+  function find(result: BenchmarkResult, id: string) {
+    const a = result.algorithms.find((x) => x.id === id);
+    if (!a || a.status !== 'ok') throw new Error(`missing ${id}`);
+    return a;
+  }
+
+  it('厳密解は件数とともに増え、ヒストグラムは件数に対してメモリが増えず、投入は件数に比例する', () => {
+    const [small, large] = run(spec).cases[0]!.sweep.runs;
+    const exactSmall = find(small!, 'exact-sort-linear');
+    const exactLarge = find(large!, 'exact-sort-linear');
+    expect(exactLarge.afterQueries.memoryBytes).toBeGreaterThan(exactSmall.afterQueries.memoryBytes * 5);
+
+    const hSmall = find(small!, 'histogram-equal-10');
+    const hLarge = find(large!, 'histogram-equal-10');
+    expect(hLarge.afterQueries.memoryBytes).toBe(hSmall.afterQueries.memoryBytes);
+    // 投入の移動は1件あたり2回
+    expect(hSmall.afterInsertion.operations.moves).toBe(2 * 1000);
+    expect(hLarge.afterInsertion.operations.moves).toBe(2 * 10000);
+    // 問い合わせの比較は件数によらずバケット数以下
+    expect(hSmall.queries[0]!.operations.comparisons).toBeLessThanOrEqual(10);
+    expect(hLarge.queries[0]!.operations.comparisons).toBeLessThanOrEqual(10);
+  });
+
+  it('バケット数を増やすと、問い合わせの操作数とメモリ見積もりが増える', () => {
+    const large = run(spec).cases[0]!.sweep.runs[1]!;
+    const h10 = find(large, 'histogram-equal-10');
+    const h100 = find(large, 'histogram-equal-100');
+    expect(h100.queries[0]!.operations.comparisons).toBeGreaterThan(h10.queries[0]!.operations.comparisons * 5);
+    expect(h100.afterQueries.memoryBytes).toBeGreaterThan(h10.afterQueries.memoryBytes * 5);
   });
 });
