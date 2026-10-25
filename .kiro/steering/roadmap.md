@@ -41,7 +41,7 @@
 
 ## Specs (dependency order)
 - [ ] percentile-lab-core -- アルゴリズム共通IF、データ分布ジェネレータ、誤差・操作数・メモリ計測、厳密解(sort / quickselect)。Dependencies: none
-- [ ] histogram-percentile -- 固定バケットのヒストグラム近似と線形補間、バケット幅と誤差の関係。Dependencies: percentile-lab-core
+- [x] histogram-percentile -- 固定バケットのヒストグラム近似と線形補間、バケット幅と誤差の関係。Dependencies: percentile-lab-core
 - [ ] streaming-quantile-sketches -- GK、KLL、t-digest の実装と、ε・圧縮パラメータと誤差の関係。Dependencies: percentile-lab-core
 - [ ] relative-error-sketches -- DDSketch と HDR Histogram の実装と、相対誤差保証の挙動。Dependencies: percentile-lab-core
 - [ ] percentile-lab-site -- サイト基盤、各系統の学習ページ、横断比較ビュー。Dependencies: histogram-percentile, streaming-quantile-sketches, relative-error-sketches
