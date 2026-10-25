@@ -162,7 +162,7 @@
   - _Boundary: Controls_
   - _Requirements: 2.1, 2.2, 2.5, 10.1, 10.2_
 
-- [ ] 5.3 (P) グラフの部品登録とグラフのパネルを実装する
+- [x] 5.3 (P) グラフの部品登録とグラフのパネルを実装する
   - 使う部品だけをグラフのライブラリに登録する。パネルは、見出し、代替テキスト付きの描画領域、軸ごとの線形/対数の切り替え、注記、数値の表を持ち、切り替えで対数軸の変換を通して描き直す
   - 系列ごとに色・破線・点の形の組を変え、動きを減らす設定ではアニメーションを止め、パネルの幅に合わせて描く。基準線は破線の系列として描く。描画層は差し替えられるようにする
   - 完了時の状態: 偽の描画層で、軸の切り替えで渡る尺度が変わる、表と代替テキストがある、動きを減らす設定でアニメーションなしになることの DOM 環境のテストが通る
@@ -256,3 +256,4 @@
 - 4.4 の ComparisonRow・CompareCharts・ELAPSED_REFERENCE_NOTE は compare-view.ts が公開している。比較表(6.5 の ComparePage)は ComparisonRow を列にする。
 - 5.1 の ComputeClient は request()/retry() を this なしの関数として返す(ボタンに直接渡せる)。WorkerLike に省略可能な onmessageerror を足した。new Worker は ui/compute/worker-factory.ts の 1 か所だけで、Vite は main.ts がこれを参照する 7.1 で初めて Worker を組み立てる。
 - 5.2 の SliderOptions に省略可能な min・max・integer を足した(件数は 100〜1,000,000 の自由入力、格子の最大は現在の件数)。ページは COUNT_RANGE を渡す。createDistributionEditor の setParamIssue は上流の項目名(modes[1].stdDev)を受け、接頭辞 data.distribution. は呼び出し側(ページ)が外して渡す。分布全体の理由(modes など)は枠全体の理由に出る。CSS の class(field-reason・visually-hidden・control-*)は 5.5 のスタイルで定義する。
+- 5.3 のグラフ部品は src/site/ui/components/ にある(chart-setup・chart-styles・chart-renderer・chart-panel)。カテゴリ軸の棒は系列ごとに別の dataset なので、各カテゴリの枠の中で左に寄って描かれる(読み取りには支障なし。7.2 の目視で見て、必要なら barPercentage などで調整する)。パネルの CSS の class(chart-panel・chart-canvas-frame・chart-controls・chart-notes・chart-table-scroll など)は 5.5 で定義し、.chart-canvas-frame には高さが必要。パネルを main.ts から使うとメインの bundle は圧縮後およそ 62 KB。
