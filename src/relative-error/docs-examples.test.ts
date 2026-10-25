@@ -1,7 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createHdrLayout, createLogMapping } from './index';
+import { generate, type AlgorithmResult, type BenchmarkResult } from '../core';
+import {
+  createDDSketch,
+  createHdrLayout,
+  createLogMapping,
+  runRelativeErrorExperiment,
+  type RelativeErrorCase,
+  type RelativeErrorExperimentSpec,
+} from './index';
 
 const docsDir = join(__dirname, '..', '..', 'docs', 'relative-error');
 const readDoc = (name: string): string => readFileSync(join(docsDir, name), 'utf8');
@@ -104,5 +112,296 @@ describe('hdr-histogram.md の数値例', () => {
     expect(sig(Math.abs(l.representative(l.indexOf(100)) - 100) / 100, 2)).toBe('0.005');
     expect(sig(1 / l.subBucketCount, 2)).toBe('0.0039');
     expect(l.upperBound(l.indexOf(1_000_000)) - l.lowerBound(l.indexOf(1_000_000))).toBe(4096);
+  });
+});
+
+// ---- experiments.md: 固定のシード・最近順位法の基準での実験の出力と、文書の表を照合する ----
+
+const SEED = 1;
+const QUANTILES: readonly number[] = [0, 0.001, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 0.999, 1];
+const WIDE_HDR = { lowest: 1e-6, highest: 1e9 } as const;
+const LOGNORMAL_WIDE = { kind: 'lognormal', mu: 3, sigma: 2 } as const;
+
+function experiment(spec: Omit<RelativeErrorExperimentSpec, 'seed' | 'quantiles' | 'referenceDefinition'>) {
+  const r = runRelativeErrorExperiment({ ...spec, seed: SEED, quantiles: QUANTILES, referenceDefinition: 'nearest-rank' });
+  if (!r.ok) throw new Error(JSON.stringify(r.error));
+  return r.value;
+}
+
+function algorithmOf(run: BenchmarkResult, id: string): Extract<AlgorithmResult, { status: 'ok' }> {
+  const a = run.algorithms.find((x) => x.id === id);
+  if (a === undefined || a.status !== 'ok') throw new Error(`algorithm: ${id}`);
+  return a;
+}
+
+const maxRelativeError = (a: Extract<AlgorithmResult, { status: 'ok' }>): number =>
+  Math.max(...a.queries.map((q) => q.relativeError));
+
+function bucketCountOf(result: ReturnType<typeof experiment>['cases'][number], count: number, id: string): number {
+  const s = result.bucketStats.find((x) => x.count === count && x.sketchId === id);
+  if (s === undefined || s.status !== 'ok') throw new Error(`stats: ${id}`);
+  return s.bucketCount;
+}
+
+const row = (...cells: (string | number)[]): string => `| ${cells.join(' | ')} |`;
+
+/** 表 A: 桁の異なる分布での、縮約が起きない DDSketch(α = 0.01)と HDR(d = 2)の相対誤差の最大値 */
+function tableA(): { rows: string[]; ddMax: number[]; hdrMax: number[]; spans: number[]; collapsed: boolean[] } {
+  const cases: RelativeErrorCase[] = [
+    { label: '対数正規 μ=0', distribution: { kind: 'lognormal', mu: 0, sigma: 1 }, hdrRange: WIDE_HDR },
+    { label: '対数正規 μ=5', distribution: { kind: 'lognormal', mu: 5, sigma: 1 }, hdrRange: WIDE_HDR },
+    { label: '対数正規 μ=10', distribution: { kind: 'lognormal', mu: 10, sigma: 1 }, hdrRange: WIDE_HDR },
+    { label: '一様 1〜10', distribution: { kind: 'uniform', min: 1, max: 10 }, hdrRange: WIDE_HDR },
+    { label: '一様 1e3〜1e4', distribution: { kind: 'uniform', min: 1e3, max: 1e4 }, hdrRange: WIDE_HDR },
+    { label: '一様 1e6〜1e7', distribution: { kind: 'uniform', min: 1e6, max: 1e7 }, hdrRange: WIDE_HDR },
+  ];
+  const result = experiment({
+    cases,
+    counts: [10000],
+    alphas: [0.01],
+    maxBucketsList: [100000],
+    significantDigitsList: [2],
+  });
+  const rows: string[] = [];
+  const ddMax: number[] = [];
+  const hdrMax: number[] = [];
+  const spans: number[] = [];
+  const collapsed: boolean[] = [];
+  for (const c of result.cases) {
+    const run = c.sweep.runs[0]!;
+    const dd = maxRelativeError(algorithmOf(run, 'ddsketch-a0.01-m100000'));
+    const hdr = maxRelativeError(algorithmOf(run, 'hdr-d2'));
+    const stat = c.bucketStats.find((s) => s.sketchId === 'ddsketch-a0.01-m100000');
+    if (stat === undefined || stat.status !== 'ok') throw new Error('stats');
+    ddMax.push(dd);
+    hdrMax.push(hdr);
+    spans.push(stat.bucketCount);
+    collapsed.push(stat.collapsed === true);
+    rows.push(row(c.label, sig(dd, 3), stat.bucketCount, sig(hdr, 3)));
+  }
+  return { rows, ddMax, hdrMax, spans, collapsed };
+}
+
+const ALPHAS = [0.1, 0.05, 0.01, 0.005, 0.001] as const;
+const DIGITS = [1, 2, 3, 4] as const;
+
+/** 表 B: α・有効桁数ごとの相対誤差の最大値、バケット数、メモリ見積もり */
+function tableB() {
+  const result = experiment({
+    cases: [{ label: 'ln', distribution: LOGNORMAL_WIDE, hdrRange: WIDE_HDR }],
+    counts: [10000],
+    alphas: ALPHAS,
+    maxBucketsList: [100000],
+    significantDigitsList: DIGITS,
+  });
+  const c = result.cases[0]!;
+  const run = c.sweep.runs[0]!;
+  const g = generate({ distribution: LOGNORMAL_WIDE, count: 10000, seed: SEED });
+  if (!g.ok) throw new Error('generate');
+  const logRange = Math.log(Math.max(...g.value) / Math.min(...g.value));
+  const dd = [...ALPHAS].sort((a, b) => b - a).map((alpha) => {
+    const id = `ddsketch-a${alpha}-m100000`;
+    const a = algorithmOf(run, id);
+    const gamma = (1 + alpha) / (1 - alpha);
+    return {
+      alpha,
+      maxRel: maxRelativeError(a),
+      span: bucketCountOf(c, 10000, id),
+      memory: a.afterInsertion.memoryBytes,
+      theory: logRange / Math.log(gamma),
+    };
+  });
+  const hdr = DIGITS.map((d) => {
+    const id = `hdr-d${d}`;
+    const a = algorithmOf(run, id);
+    const l = createHdrLayout({ ...WIDE_HDR, significantDigits: d });
+    if (!l.ok) throw new Error('layout');
+    return {
+      d,
+      s: l.value.subBucketCount,
+      maxRel: maxRelativeError(a),
+      total: bucketCountOf(c, 10000, id),
+      memory: a.afterInsertion.memoryBytes,
+    };
+  });
+  const ddRows = dd.map((r) => row(r.alpha, sig(r.maxRel, 3), r.span, sig(r.theory, 3), r.memory));
+  const hdrRows = hdr.map((r) => row(r.d, r.s, sig(1 / r.s, 3), sig(r.maxRel, 3), r.total, r.memory));
+  return { dd, hdr, ddRows, hdrRows };
+}
+
+const COLLAPSE_BUCKETS = [32, 128, 512, 2048] as const;
+const COLLAPSE_QUANTILES: readonly number[] = [0, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999, 1];
+
+/** 表 C: m を小さくして縮約が起きたときの、分位点ごとの相対誤差 */
+function tableC() {
+  const result = experiment({
+    cases: [{ label: 'ln', distribution: LOGNORMAL_WIDE, hdrRange: WIDE_HDR }],
+    counts: [10000],
+    alphas: [0.01],
+    maxBucketsList: COLLAPSE_BUCKETS,
+    significantDigitsList: [2],
+  });
+  const run = result.cases[0]!.sweep.runs[0]!;
+  const g = generate({ distribution: LOGNORMAL_WIDE, count: 10000, seed: SEED });
+  if (!g.ok) throw new Error('generate');
+  const columns = COLLAPSE_BUCKETS.map((m) => {
+    const a = algorithmOf(run, `ddsketch-a0.01-m${m}`);
+    const sketch = createDDSketch({ alpha: 0.01, maxBuckets: m });
+    if (!sketch.ok) throw new Error('sketch');
+    for (const x of g.value) sketch.value.insert(x);
+    const snap = sketch.value.inspect();
+    const byQuantile = a.queries.map((q) => ({ q: q.quantile, estimate: q.estimate, rel: q.relativeError }));
+    return { m, snap, byQuantile };
+  });
+  const rows = COLLAPSE_QUANTILES.map((q) =>
+    row(
+      q,
+      ...columns.map((c) => sig(c.byQuantile.find((x) => x.q === q)!.rel, 3)),
+    ),
+  );
+  rows.push(row('縮約の回数', ...columns.map((c) => c.snap.collapseCount)));
+  rows.push(row('縮約の影響の上限', ...columns.map((c) => (c.snap.collapsedUpperBound === null ? 'なし' : sig(c.snap.collapsedUpperBound, 3)))));
+  return { columns, rows };
+}
+
+const SWEEP_COUNTS = [1000, 10000, 100000] as const;
+
+/** 表 D: 件数を増やしたときのメモリ見積もりと、投入・問い合わせの操作数(DDSketch、HDR、厳密解) */
+function tableD() {
+  const result = experiment({
+    cases: [{ label: 'ln', distribution: LOGNORMAL_WIDE, hdrRange: WIDE_HDR }],
+    counts: SWEEP_COUNTS,
+    alphas: [0.01],
+    maxBucketsList: [2048],
+    significantDigitsList: [2],
+  });
+  const ids = ['exact-sort-nearest-rank', 'ddsketch-a0.01-m2048', 'hdr-d2'] as const;
+  const total = (o: { comparisons: number; moves: number }): number => o.comparisons + o.moves;
+  const data = SWEEP_COUNTS.map((count) => {
+    const run = result.cases[0]!.sweep.runs.find((r) => r.count === count)!;
+    return {
+      count,
+      byId: ids.map((id) => {
+        const a = algorithmOf(run, id);
+        return {
+          id,
+          memory: a.afterInsertion.memoryBytes,
+          insert: total(a.afterInsertion.operations),
+          query: total(a.afterQueries.operations) - total(a.afterInsertion.operations),
+        };
+      }),
+    };
+  });
+  const memoryRows = data.map((d) => row(d.count, ...d.byId.map((x) => x.memory)));
+  const insertRows = data.map((d) => row(d.count, ...d.byId.map((x) => sig(x.insert / d.count, 3))));
+  const queryRows = data.map((d) => row(d.count, ...d.byId.map((x) => x.query)));
+  return { data, memoryRows, insertRows, queryRows };
+}
+
+describe('experiments.md の数値', () => {
+  const doc = readDoc('experiments.md');
+  const hasRows = (rows: readonly string[]): void => {
+    for (const r of rows) expect(doc, r).toContain(`${r}\n`);
+  };
+
+  it('表 1: 桁の異なる分布', () => {
+    const a = tableA();
+    hasRows(a.rows);
+    for (const dd of a.ddMax) expect(dd).toBeLessThanOrEqual(0.01);
+    for (const hdr of a.hdrMax) expect(hdr).toBeLessThanOrEqual(1 / 256);
+    expect(a.collapsed.every((c) => !c)).toBe(true);
+    expect(a.spans.slice(0, 3)).toEqual([364, 364, 364]);
+    expect(a.spans.slice(3)).toEqual([116, 116, 116]);
+  });
+
+  it('表 2: α・有効桁数ごとの誤差・バケット数・メモリ', () => {
+    const b = tableB();
+    hasRows(b.ddRows);
+    hasRows(b.hdrRows);
+    for (const r of b.dd) {
+      expect(r.maxRel).toBeLessThanOrEqual(r.alpha);
+      expect(Math.abs(r.span - r.theory)).toBeLessThan(2);
+      expect(r.memory).toBe((r.span + 6) * 8);
+    }
+    for (const r of b.hdr) expect(r.maxRel).toBeLessThanOrEqual(1 / r.s);
+    // α を小さく・有効桁数を大きくすると、バケット数とメモリが増える
+    for (let i = 1; i < b.dd.length; i++) {
+      expect(b.dd[i]!.span).toBeGreaterThan(b.dd[i - 1]!.span);
+      expect(b.dd[i]!.memory).toBeGreaterThan(b.dd[i - 1]!.memory);
+      // α にほぼ反比例する
+      expect(b.dd[i]!.span / b.dd[i - 1]!.span).toBeGreaterThan(1.9);
+    }
+    for (let i = 1; i < b.hdr.length; i++) {
+      const ratio = b.hdr[i]!.total / b.hdr[i - 1]!.total;
+      expect(ratio).toBeGreaterThan(7);
+      expect(ratio).toBeLessThan(14.5);
+      expect(b.hdr[i]!.s / b.hdr[i - 1]!.s).toBeGreaterThanOrEqual(8);
+    }
+    const g = generate({ distribution: LOGNORMAL_WIDE, count: 10000, seed: SEED });
+    if (!g.ok) throw new Error('generate');
+    const [min, max] = [Math.min(...g.value), Math.max(...g.value)];
+    expect(sig(min, 3)).toBe('0.0148');
+    expect(Math.round(max)).toBe(29292);
+    expect(sig(Math.log(max / min), 3)).toBe('14.5');
+    expect(sig(Math.exp(5), 3)).toBe('148');
+    expect(b.dd.find((r) => r.alpha === 0.005)!.span).toBe(1451);
+    expect(b.hdr.find((r) => r.d === 2)!.total).toBe(5632);
+  });
+
+  it('表 3: 縮約の影響(低い分位点で破れ、高い分位点で保たれる)', () => {
+    const c = tableC();
+    hasRows(c.rows);
+    for (const col of c.columns) {
+      const bound = col.snap.collapsedUpperBound;
+      for (const x of col.byQuantile) {
+        // 影響の上限より大きい推定は、相対誤差が α 以下
+        if (bound === null || x.estimate > bound) expect(x.rel).toBeLessThanOrEqual(0.01 * (1 + 1e-9));
+      }
+      // 最大値(分位点 1)は、どの m でも α 以下で、同じ値
+      expect(col.byQuantile.find((x) => x.q === 1)!.rel).toBe(c.columns[0]!.byQuantile.find((x) => x.q === 1)!.rel);
+    }
+    const [m32, m128, m512, m2048] = c.columns as [
+      (typeof c.columns)[number], (typeof c.columns)[number], (typeof c.columns)[number], (typeof c.columns)[number],
+    ];
+    expect(m2048.snap.collapsed).toBe(false);
+    expect(m2048.byQuantile.every((x) => x.rel <= 0.01)).toBe(true);
+    for (const col of [m32, m128, m512]) {
+      expect(col.snap.collapsed).toBe(true);
+      expect(col.byQuantile.find((x) => x.q === 0)!.rel).toBeGreaterThan(0.01);
+    }
+    // m が小さいほど影響の上限が大きく、破れる分位点が多い
+    expect(m32.snap.collapsedUpperBound!).toBeGreaterThan(m128.snap.collapsedUpperBound!);
+    expect(m128.snap.collapsedUpperBound!).toBeGreaterThan(m512.snap.collapsedUpperBound!);
+    const broken = (col: typeof m32): number => col.byQuantile.filter((x) => x.rel > 0.01).length;
+    expect(broken(m32)).toBeGreaterThan(broken(m128));
+    expect(broken(m128)).toBeGreaterThan(broken(m512));
+    // 高めの分位点でも、上限以下の推定には保証がない
+    const q99 = m128.byQuantile.find((x) => x.q === 0.99)!;
+    expect(q99.estimate).toBeLessThanOrEqual(m128.snap.collapsedUpperBound!);
+    expect(q99.rel).toBeGreaterThan(0.01);
+  });
+
+  it('表 4: 件数を増やしたときのメモリと操作数', () => {
+    const d = tableD();
+    hasRows(d.memoryRows);
+    hasRows(d.insertRows);
+    hasRows(d.queryRows);
+    const at = (count: number, index: number) => d.data.find((x) => x.count === count)!.byId[index]!;
+    // 厳密解のメモリは件数に比例、HDR は一定、DDSketch は上限以下
+    expect(at(10000, 0).memory).toBe(10 * at(1000, 0).memory);
+    expect(at(100000, 0).memory).toBe(10 * at(10000, 0).memory);
+    expect(at(1000, 2).memory).toBe(at(100000, 2).memory);
+    for (const count of [1000, 10000, 100000]) expect(at(count, 1).memory).toBeLessThanOrEqual((2048 + 6) * 8);
+    // 投入 1 件あたりの操作数は件数で増えない
+    for (const count of [1000, 10000, 100000]) {
+      expect(at(count, 1).insert / count).toBeLessThan(10);
+      expect(at(count, 2).insert / count).toBeLessThan(5.1);
+    }
+    // 問い合わせ: 厳密解は件数より速く増え、DDSketch・HDR はほとんど増えない
+    expect(at(100000, 0).query / at(1000, 0).query).toBeGreaterThan(100);
+    expect(at(100000, 1).query / at(1000, 1).query).toBeLessThan(1.5);
+    expect(at(100000, 2).query / at(1000, 2).query).toBeLessThan(1.1);
+    expect(Math.round(at(100000, 0).query / at(1000, 0).query)).toBe(175);
+    expect(Math.round((at(100000, 1).query / at(1000, 1).query) * 100) / 100).toBe(1.25);
   });
 });
