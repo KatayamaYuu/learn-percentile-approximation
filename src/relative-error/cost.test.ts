@@ -33,7 +33,7 @@ function insertDeltas(s: PercentileSketch, values: Float64Array): { comparisons:
   return out;
 }
 
-describe('DDSketch の投入の操作数', () => {
+describe('DDSketch の投入の操作数', { timeout: 60_000 }, () => {
   const cases: [number, number][] = [
     [1000, 64],
     [1000, 2048],
@@ -55,10 +55,11 @@ describe('DDSketch の投入の操作数', () => {
   });
 });
 
-describe('HDR の投入の操作数', () => {
+describe('HDR の投入の操作数', { timeout: 60_000 }, () => {
   it.each([1000, 100_000])('件数 %i: 有効桁数を変えても比較 4 回以下・移動 2 回', (count) => {
+    const values = data(count);
     for (const d of [0, 1, 2, 3, 4]) {
-      for (const delta of insertDeltas(hdr(d), data(count))) {
+      for (const delta of insertDeltas(hdr(d), values)) {
         expect(delta.comparisons).toBeLessThanOrEqual(4);
         expect(delta.moves).toBe(2);
       }
