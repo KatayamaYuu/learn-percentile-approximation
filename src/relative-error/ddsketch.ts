@@ -102,7 +102,34 @@ function makeDDSketch(mapping: LogMapping, maxBuckets: number): DDSketch {
     },
 
     inspect(): DDSketchSnapshot {
-      throw new Error('inspect は 3.2 で実装する');
+      // 計数器を使わず、ストアの状態から新しい値を組み立てる(件数が 1 以上のバケットだけを番号の昇順に並べる)
+      const view = store.view();
+      const buckets: BucketView[] = [];
+      for (let p = 0; p < view.span; p++) {
+        const count = view.counts[p]!;
+        if (count === 0) continue;
+        const index = view.minIndex! + p;
+        buckets.push({
+          index,
+          lower: mapping.lowerBound(index),
+          upper: mapping.upperBound(index),
+          representative: mapping.representative(index),
+          count,
+        });
+      }
+      return {
+        kind: 'ddsketch',
+        alpha: mapping.alpha,
+        gamma: mapping.gamma,
+        maxBuckets,
+        totalCount: view.total,
+        span: view.span,
+        nonEmptyBuckets: buckets.length,
+        buckets,
+        collapsed: view.collapseCount > 0,
+        collapsedUpperBound: view.collapsedUpToIndex === null ? null : mapping.upperBound(view.collapsedUpToIndex),
+        collapseCount: view.collapseCount,
+      };
     },
   };
 }

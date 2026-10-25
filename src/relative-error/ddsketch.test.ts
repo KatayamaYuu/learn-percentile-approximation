@@ -185,3 +185,116 @@ describe('設定と SketchSpec', () => {
     expect(!r.ok && r.error.field).toBe('alpha');
   });
 });
+
+describe('inspect', () => {
+  it('全項目を返す(縮約なし)', () => {
+    const s = make(0.01, 1000);
+    load(s, [10, 10, 10, 1000]);
+    const snap = s.inspect();
+    const m = createLogMapping(0.01);
+    if (!m.ok) throw new Error();
+    const i10 = m.value.indexOf(10);
+    const i1000 = m.value.indexOf(1000);
+    expect(snap).toMatchObject({
+      kind: 'ddsketch',
+      alpha: 0.01,
+      gamma: m.value.gamma,
+      maxBuckets: 1000,
+      totalCount: 4,
+      span: i1000 - i10 + 1,
+      nonEmptyBuckets: 2,
+      collapsed: false,
+      collapsedUpperBound: null,
+      collapseCount: 0,
+    });
+    expect(snap.buckets).toEqual([
+      {
+        index: i10,
+        lower: m.value.lowerBound(i10),
+        upper: m.value.upperBound(i10),
+        representative: m.value.representative(i10),
+        count: 3,
+      },
+      {
+        index: i1000,
+        lower: m.value.lowerBound(i1000),
+        upper: m.value.upperBound(i1000),
+        representative: m.value.representative(i1000),
+        count: 1,
+      },
+    ]);
+  });
+
+  it('件数の合計が総件数と一致し、番号は昇順', () => {
+    const g = generate({ distribution: { kind: 'lognormal', mu: 2, sigma: 1.5 }, count: 3000, seed: 3 });
+    if (!g.ok) throw new Error();
+    for (const m of [8, 64, 2048]) {
+      const s = make(0.02, m);
+      load(s, g.value);
+      const snap = s.inspect();
+      expect(snap.buckets.reduce((a, b) => a + b.count, 0)).toBe(snap.totalCount);
+      expect(snap.totalCount).toBe(3000);
+      expect(snap.span).toBeLessThanOrEqual(m);
+      expect(snap.nonEmptyBuckets).toBe(snap.buckets.length);
+      for (let i = 1; i < snap.buckets.length; i++) {
+        expect(snap.buckets[i]!.index).toBeGreaterThan(snap.buckets[i - 1]!.index);
+      }
+    }
+  });
+
+  it('観察の前後で状態・操作数・メモリ見積もりが同じ', () => {
+    const s = make(0.01, 16);
+    load(s, [1, 5, 50, 500, 5000, 5e4, 5e5, 5e6]);
+    const ops = s.operationCounts();
+    const mem = s.memoryBytes();
+    const q = s.query(0.3);
+    const ops2 = s.operationCounts();
+    s.inspect();
+    s.inspect();
+    expect(s.operationCounts()).toEqual(ops2);
+    expect(ops2.comparisons).toBeGreaterThan(ops.comparisons);
+    expect(s.memoryBytes()).toBe(mem);
+    expect(s.query(0.3)).toEqual(q);
+  });
+
+  it('観察結果はその後の投入で変わらず、JSON を往復できる', () => {
+    const s = make(0.01, 4);
+    load(s, [1, 2, 3, 100, 1e6, 1e9]);
+    const snap = s.inspect();
+    const frozen = JSON.parse(JSON.stringify(snap));
+    expect(frozen).toEqual(snap);
+    load(s, [7, 7, 7, 1e12, 5]);
+    expect(snap).toEqual(frozen);
+    expect(s.inspect()).not.toEqual(frozen);
+  });
+
+  it('m を小さくして縮約を起こすと、影響の上限より上の推定は相対誤差 α 以下', () => {
+    const alpha = 0.02;
+    const g = generate({ distribution: { kind: 'lognormal', mu: 3, sigma: 2.5 }, count: 20_000, seed: 11 });
+    if (!g.ok) throw new Error();
+    const s = make(alpha, 40);
+    load(s, g.value);
+    const snap = s.inspect();
+    expect(snap.collapsed).toBe(true);
+    expect(snap.collapseCount).toBeGreaterThan(0);
+    expect(snap.collapsedUpperBound).not.toBeNull();
+    const bound = snap.collapsedUpperBound!;
+    const sorted = Float64Array.from(g.value).sort();
+    let above = 0;
+    let broken = 0;
+    for (let k = 0; k <= 1000; k++) {
+      const q = k / 1000;
+      const exact = exactQuantileSorted(sorted, q, 'nearest-rank');
+      const est = s.query(q);
+      if (!est.ok) throw new Error();
+      const rel = Math.abs(est.value - exact) / exact;
+      if (est.value > bound) {
+        above++;
+        expect(rel).toBeLessThanOrEqual(alpha * (1 + 1e-9));
+      } else if (rel > alpha) broken++;
+    }
+    expect(above).toBeGreaterThan(0);
+    // 低い分位点では保証が破れる(縮約の影響が見える)
+    expect(broken).toBeGreaterThan(0);
+  });
+});
