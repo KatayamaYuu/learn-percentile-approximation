@@ -511,3 +511,24 @@ button[aria-pressed='true'] {
   min-width: 0;
   margin-top: 24px;
 }
+
+/* 相対誤差型のページの通知(縮約、HDR の範囲と有効桁数) */
+.collapse-notice,
+.hdr-notices {
+  margin: 12px 0;
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+
+.collapse-notice-collapsed {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.hdr-notices {
+  padding-left: 2em;
+  color: var(--text-muted);
+}

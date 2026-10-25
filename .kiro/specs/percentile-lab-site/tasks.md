@@ -210,7 +210,7 @@
   - _Boundary: StreamingPage_
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 9.2, 9.6_
 
-- [ ] 6.4 (P) 相対誤差型のページを組み立てる
+- [x] 6.4 (P) 相対誤差型のページを組み立てる
   - 手法の選択、α・バケット数の上限・有効桁数、HDR の範囲(自動・手動)、内部状態の対象の操作部品を置き、相対誤差型の表示、縮約の通知、HDR の通知(除いた有効桁数、範囲の基準)、バケットの図と表、解説(DDSketch、HDR Histogram)と手引きをつなぐ
   - 完了時の状態: 偽の計算の窓口と記録した結果で、グラフ、α と 1/S の基準線、縮約の通知、除いた有効桁数の通知、HDR の失敗の注記、解説が出ることの DOM 環境のテストが通る
   - _Depends: 4.3, 6.1_
@@ -262,3 +262,4 @@
 - 6.1 の PageKit は src/site/ui/pages/page-kit.ts の mountPageKit(spec, container, context, deps?)。PageSpec は id・defaults・defaultSelection?(相対誤差型は {metric:"relative",pick:{kind:"max"}})・errorSelector?・toJob・validate・createControls(host)(host.update(prev => next) で条件を変える。showIssues に FieldIssue[] を渡す)・buildView(result, condition, selection)(戻りは {charts, extras?} または null)・createExplainer? を持つ。reasonFor と distributionIssues(data.distribution. を外す)を公開している。画面の事前判定は HDR の項を含まないので、HDR による上限超過は Worker が over-limit で返す。ComputeClient に取り消しはなく、無効に変えた直後でも待ち合わせ中の依頼は送られ、結果は捨てられる。extras は誤差の選択のたびに作り直される。
 - 6.2: 共通のデータ条件の操作部品は src/site/ui/pages/data-controls.ts の createDataControls({ idPrefix, host: { initial: DataCondition, update(fn) } }) → { elements: [分布, 件数, シード, 順序], setValue(data)(update を呼ばない), showIssues(issues)(data.distribution.*・data.count・data.seed・data.order を対応づけ、古い理由を消す) }。ページは host.update(c => ({...c, data: fn(c.data)})) で包んで使い、ページごとに別の idPrefix を渡す(hist-・stream-・rel-・cmp- など。分布の部品の id は固定で、同時に 2 ページは載らない)。ページのモジュールは histogramPage(id histogram・path /histogram)をエクスポートし、page-registry.ts は 7.1 で差し替える。テスト用に histogramPageSpec と mountHistogramPage(container, context, deps) も公開している。
 - 6.3: streamingPage(id streaming・path /streaming・idPrefix stream)を src/site/ui/pages/streaming-page.ts からエクスポート。内部状態の図のグラフ id は対象に応じて streaming-inspect-gk|kll|tdigest と変わるため、対象を切り替えると PageKit が全パネルを作り直す(軸の切り替えは初期化される)。ε・k・δ・スケール関数の部品は手法を選んでいなくても出したままにする。
+- 6.4: relativePage(id relative・path /relative-error・idPrefix rel)を src/site/ui/pages/relative-page.ts からエクスポート。α(0<α<1)の確認は shared/validate.ts にないため、ページ側の validate ラッパで ddsketch を選んだときだけ行っている(ALPHA_BOUNDS を使う)。Worker 側の alpha の失敗の対応づけは残す。手動の HDR 範囲の初期値は 0.01〜100000。
