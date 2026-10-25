@@ -121,7 +121,7 @@
   - _Boundary: HistogramView_
   - _Requirements: 4.3, 4.4, 4.5, 4.6_
 
-- [ ] 4.2 (P) ストリーミング分位点のページの表示を作る
+- [x] 4.2 (P) ストリーミング分位点のページの表示を作る
   - 手法ごとのパラメータ × 誤差とパラメータ × メモリ、メモリ × 誤差、分位点 × 誤差、順序ごとの誤差の棒、試行が 2 回以上のときの KLL の試行ごとの誤差、GK を表示しているときの順位誤差の ε の基準線を作る。選んでいない手法は除く
   - 内部状態の図(GK は値と g + 順位の幅、KLL は段ごとの保持数と容量、t-digest は平均値と重み)、表(200 行を超えたら先頭と末尾だけと明記)、要点の数値を作る
   - 完了時の状態: 期待した枚数のグラフ、ε の基準線、試行 1 回では試行のグラフがないこと、3 種の内部状態の表と省略の判定の単体テストが通る
@@ -251,3 +251,4 @@
 - 3.2・3.3 のジョブは、設計が orders を挙げない掃引でもデータ条件の順序(c.data.order)を上流に渡す(順序の操作と条件の表示を効かせるため)。ストリーミングの詳細の呼び出しだけが 3 つの順序をすべて使う。
 - 3.4 の runRelativePage は Result<RelativePageResult, JobFailure> を返す(設計どおり)。3.2・3.3 のジョブは FieldIssue[] の失敗を返すので、3.6 で invalid-condition に包む。3.5 の runCompare は 3.4 と同じ JobFailure を返す。
 - 4.1 の表示関数は ViewOptions を histogram-view.ts から公開している(selection のみ)。4.2〜4.4 はここから import するか、必要なら中立の場所に移す。表示関数は生の ChartSpec を返し、対数軸での 0 以下の除外は 5.3 のパネルが prepareForScale で行う。系列の表示名(日本語)は各 View が付ける。
+- 4.2 の InspectionView は設計に truncation({total, head, tail, notice})を足している。5.4 の状態表(StateTable)はこの notice を表示に使う。
