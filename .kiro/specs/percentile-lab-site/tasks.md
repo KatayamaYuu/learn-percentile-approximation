@@ -146,7 +146,7 @@
   - _Requirements: 8.3, 8.4, 8.5, 8.8_
 
 - [ ] 5. 表示層の部品
-- [ ] 5.1 (P) 計算の依頼の窓口と Worker の生成を実装する
+- [x] 5.1 (P) 計算の依頼の窓口と Worker の生成を実装する
   - 依頼を 250ms 待ち合わせてまとめ、単調増加の番号を付けて送る。実行中に新しい依頼が来たら Worker を終了して作り直す。最新の番号の応答だけを配送し、Worker の異常は失敗として配送する。再実行と破棄を用意する
   - Worker の生成は 1 か所に閉じ込め、テストでは偽の Worker を渡せるようにする
   - 完了時の状態: 偽の Worker と偽のタイマーで、連続した依頼で送信が 1 回、実行中の新しい依頼で終了が呼ばれ古い応答が配送されない、異常で失敗が配送される、破棄の後は配送しないことの DOM 環境のテストが通る
@@ -254,3 +254,4 @@
 - 4.2 の InspectionView は設計に truncation({total, head, tail, notice})を足している。5.4 の状態表(StateTable)はこの notice を表示に使う。
 - 4.3 は SeriesSpec に省略可能な dashed?: boolean を足した(破線の系列)。5.3 のパネルは dashed の系列に破線の見た目を付ける。相対誤差型のページ(6.4)は誤差の選択の初期値を { metric: "relative", pick: { kind: "max" } } にして View に渡す(DEFAULT_ERROR_SELECTION は順位誤差)。基準線(α・1/S)は相対誤差の指標のときだけ出る。
 - 4.4 の ComparisonRow・CompareCharts・ELAPSED_REFERENCE_NOTE は compare-view.ts が公開している。比較表(6.5 の ComparePage)は ComparisonRow を列にする。
+- 5.1 の ComputeClient は request()/retry() を this なしの関数として返す(ボタンに直接渡せる)。WorkerLike に省略可能な onmessageerror を足した。new Worker は ui/compute/worker-factory.ts の 1 か所だけで、Vite は main.ts がこれを参照する 7.1 で初めて Worker を組み立てる。
