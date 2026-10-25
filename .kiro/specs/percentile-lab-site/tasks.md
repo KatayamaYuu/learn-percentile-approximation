@@ -145,7 +145,7 @@
   - _Boundary: CompareView_
   - _Requirements: 8.3, 8.4, 8.5, 8.8_
 
-- [ ] 5. 表示層の部品
+- [x] 5. 表示層の部品
 - [x] 5.1 (P) 計算の依頼の窓口と Worker の生成を実装する
   - 依頼を 250ms 待ち合わせてまとめ、単調増加の番号を付けて送る。実行中に新しい依頼が来たら Worker を終了して作り直す。最新の番号の応答だけを配送し、Worker の異常は失敗として配送する。再実行と破棄を用意する
   - Worker の生成は 1 か所に閉じ込め、テストでは偽の Worker を渡せるようにする
@@ -178,7 +178,7 @@
   - _Boundary: StatusBar・ConditionSummary・ErrorSelector・StateTable・Explainer_
   - _Requirements: 2.8, 3.2, 3.5, 3.6, 7.2, 9.2, 10.6_
 
-- [ ] 5.5 (P) ルーティング、共通のレイアウト、条件の保持、トップページ、見つからないページ、スタイルを実装する
+- [x] 5.5 (P) ルーティング、共通のレイアウト、条件の保持、トップページ、見つからないページ、スタイルを実装する
   - ハッシュから表示するページを決め(空はトップ、未知は見つからないページ)、ハッシュの変化でページを入れ替え、前のページを片付ける。共通の見出しとナビゲーション(現在のページの明示)、ライブリージョン、ページ題名の更新、見出しへのフォーカス移動を作る
   - ページごとの最後の条件をメモリに保持する。トップページ(系統の概要、各ページへの案内、グラフの読み方)と見つからないページを作る
   - ページの登録はこのタスクが作る。4 つの学習ページは、正しい識別・パス・題名を持つ仮のページ(「準備中」と表示)として登録し、7.1 で実際のページに差し替える
@@ -258,3 +258,4 @@
 - 5.2 の SliderOptions に省略可能な min・max・integer を足した(件数は 100〜1,000,000 の自由入力、格子の最大は現在の件数)。ページは COUNT_RANGE を渡す。createDistributionEditor の setParamIssue は上流の項目名(modes[1].stdDev)を受け、接頭辞 data.distribution. は呼び出し側(ページ)が外して渡す。分布全体の理由(modes など)は枠全体の理由に出る。CSS の class(field-reason・visually-hidden・control-*)は 5.5 のスタイルで定義する。
 - 5.3 のグラフ部品は src/site/ui/components/ にある(chart-setup・chart-styles・chart-renderer・chart-panel)。カテゴリ軸の棒は系列ごとに別の dataset なので、各カテゴリの枠の中で左に寄って描かれる(読み取りには支障なし。7.2 の目視で見て、必要なら barPercentage などで調整する)。パネルの CSS の class(chart-panel・chart-canvas-frame・chart-controls・chart-notes・chart-table-scroll など)は 5.5 で定義し、.chart-canvas-frame には高さが必要。パネルを main.ts から使うとメインの bundle は圧縮後およそ 62 KB。
 - 5.4: 6.1 の PageKit は最後に依頼した JobRequest を保持し、done の状態を受け取った時点で ConditionSummary.show(job, result) を呼ぶ(ComputeStatus は job を持たない)。再実行ボタンは exception の失敗だけに出る。Explainer の見出しは h2(節)・h3(手法名)・h4(4 項目)で、ページの題名を h1 とする前提。5.5 のレイアウトは h1 を 1 つ、結果と操作の領域を h2 にする。5.4 の部品が使う CSS の class は status-bar・status-pending・status-failed・condition-summary・state-table(-scroll・-notice・-gap・-rejected・-facts)・explainer(-item・-algorithms・-guide)・control-error-selector。state-table-scroll は overflow: auto が必要。
+- 5.5: 7.1 の main.ts は ./ui/styles/site.css を import し、startRouter(root, { store: createConditionStore(), announce, createCompute }) を呼ぶ。PAGES の 4 つの準備中ページを 6.2〜6.5 に差し替える。2 列の骨組みは .page-columns・.page-controls・.page-results(site.css に定義済み)。ConditionStore は同じ参照を保存・返却するので、ページは保存した条件を書き換えない。--border の色は白に対して約 2.1:1(非テキストの 3:1 に満たない)。スキップリンクは未実装(要件になし)。ページを実装する 6.x が site.css に無い class を使うとクラス走査のテストが失敗する。
