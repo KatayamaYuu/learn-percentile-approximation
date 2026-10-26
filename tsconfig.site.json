@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"]
+  },
+  "include": [
+    "src/site/main.ts",
+    "src/site/ui/**/*.ts",
+    "src/site/shared/**/*.ts",
+    "src/site/content/**/*.ts"
+  ],
+  "exclude": []
+}
